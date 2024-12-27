@@ -341,4 +341,4 @@ docker buildx build --platform linux/amd64,linux/arm64 -t jqknono/weread-challen
 
 - 脚本下载链接: [weread-challenge.js](https://storage1.techfetch.dev/weread-challenge/weread-challenge.js)
 - 文章来源: [https://blog.techfetch.dev](https://blog.techfetch.dev/blog/2024/12/05/%E5%BE%AE%E4%BF%A1%E8%AF%BB%E4%B9%A6%E8%87%AA%E5%8A%A8%E6%89%93%E5%8D%A1%E5%88%B7%E6%97%B6%E9%95%BF/)
-- 展示: [https://weread-challenge.techfetch.dev](https://weread-challenge.techfetch.dev)
+- 统计: [https://weread-challenge.techfetch.dev](https://weread-challenge.techfetch.dev)
