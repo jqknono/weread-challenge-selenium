@@ -296,6 +296,7 @@ Selenium_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}
 | `WEREAD_USER`           | `weread-default` | -                                     | 用户标识         |
 | `WEREAD_REMOTE_BROWSER` | ""               | -                                     | 远程浏览器地址   |
 | `WEREAD_DURATION`       | `10`             | -                                     | 阅读时长         |
+| `WEREAD_SPEED`          | `slow`           | `slow,normal,fast`                    | 阅读速度         |
 | `WEREAD_SELECTION`      | `random`         | [0-4]                                 | 选择阅读的书籍   |
 | `WEREAD_BROWSER`        | `chrome`         | `chrome,MicrosoftEdge,firefox,safari` | 浏览器           |
 | `ENABLE_EMAIL`          | `false`          | `true,false`                          | 邮件通知         |

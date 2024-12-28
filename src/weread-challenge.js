@@ -4,6 +4,7 @@
  * All rights reserved.
  * Licensed under the MIT License.
  * For more information, contact: weread-challenge@techfetch.dev
+ * 修改请保留统计代码
  */
 
 const { By, Builder, Browser, until, Key } = require("selenium-webdriver");
@@ -22,8 +23,9 @@ const DEBUG = process.env.DEBUG === "true" || false; // Enable debug mode
 const WEREAD_USER = process.env.WEREAD_USER || "weread-default"; // User to use
 const WEREAD_REMOTE_BROWSER = process.env.WEREAD_REMOTE_BROWSER;
 const WEREAD_DURATION = process.env.WEREAD_DURATION || 10; // Reading duration in minutes
+const WEREAD_SPEED = process.env.WEREAD_SPEED || "slow"; // Reading speed, slow | normal | fast
 const WEREAD_SELECTION = process.env.WEREAD_SELECTION || 0; // Selection method
-const WEREAD_BROWSER = process.env.WEREAD_BROWSER || Browser.CHROME; // Browser to use, chrome | MicrosoftEdge | firefox | safari
+const WEREAD_BROWSER = process.env.WEREAD_BROWSER || Browser.CHROME; // Browser to use, chrome | MicrosoftEdge | firefox
 const ENABLE_EMAIL = process.env.ENABLE_EMAIL === "true" || false; // Enable email notifications
 const WEREAD_AGREE_TERMS = process.env.WEREAD_AGREE_TERMS === "true" || true; // Agree to terms
 // env vars:
@@ -139,6 +141,10 @@ function logEventToWereadLog(err) {
 }
 
 function getUserInfo() {
+  // return empty object if cookies file not found
+  if (!fs.existsSync(COOKIE_FILE)) {
+    return {};
+  }
   // read from cookies
   let cookiesFile = fs.readFileSync(COOKIE_FILE, "utf8");
   let cookies = JSON.parse(cookiesFile);
@@ -525,14 +531,14 @@ async function main() {
       return;
     }
 
-    if (WEREAD_AGREE_TERMS) {
-      logEventToWereadLog("");
-    }
-
     console.info("Successfully logged in.");
 
     // If cookies exist, save them
     await saveCookies(driver, COOKIE_FILE);
+
+    if (WEREAD_AGREE_TERMS) {
+      logEventToWereadLog("");
+    }
 
     // Find the first div with class "wr_index_mini_shelf_card"
     let selection = Number(WEREAD_SELECTION);
@@ -606,6 +612,11 @@ async function main() {
       let currentTime = new Date();
       // wait for random time between 300ms to 1s
       let randomTime = Math.floor(Math.random() * 700) + 300;
+      if (WEREAD_SPEED === "fast") {
+        randomTime = Math.floor(Math.random() * 100) + 100;
+      } else if (WEREAD_SPEED === "normal") {
+        randomTime = Math.floor(Math.random() * 400) + 200;
+      }
       await new Promise((resolve) => setTimeout(resolve, randomTime));
       if (currentTime.getMinutes() !== screenshotTime.getMinutes()) {
         // take screenshot every minute, and get round index
