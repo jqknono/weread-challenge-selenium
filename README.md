@@ -33,6 +33,7 @@
 - 支持自动阅读
 - 支持跳到下一章
 - 支持读完跳回第一章继续阅读
+- 支持选择阅读速度
 - 随机单页阅读时间
 - 随机翻页时间
 - 每分钟截图当前界面
@@ -41,8 +42,8 @@
 - 支持设置阅读时间
 - 支持邮件通知
 - 多平台支持: `linux | windows | macos`
-- 多架构支持: `amd64 | arm64`
-- 支持浏览器: `chrome | MicrosoftEdge | firefox | safari`
+<!-- - 多架构支持: `amd64 | arm64` -->
+- 支持浏览器: `chrome | MicrosoftEdge | firefox`
 - 支持多用户
 - 异常时强制刷新
 - 使用统计
@@ -50,8 +51,6 @@
 ## Linux
 
 ### 直接运行
-
-下载链接: [weread-challenge.js](https://storage1.techfetch.dev/weread-challenge/weread-challenge.js)
 
 ```bash
 # 安装nodejs
@@ -66,9 +65,9 @@ npm install selenium-webdriver
 # 下载脚本
 wget https://storage1.techfetch.dev/weread-challenge/weread-challenge.js -O weread-challenge.js
 # 通过环境变量设置运行参数
-export WEREAD_BROWSER="firefox"
+export WEREAD_BROWSER="chrome"
 # 运行
-WEREAD_BROWSER="firefox" node weread-challenge.js
+WEREAD_BROWSER="chrome" node weread-challenge.js
 ```
 
 如需邮件通知, 需安装 _nodemailer_:
@@ -107,7 +106,8 @@ services:
       retries: 10
 ```
 
-保存为 `docker-compose.yml`, 运行 `docker compose up -d`.
+保存为 `docker-compose.yml`, 运行 `docker compose up -d`.  
+首次启动后, 需微信扫描二维码登录, 二维码保存在 `./data/login.png`
 
 ### Docker 运行
 
@@ -141,9 +141,11 @@ docker run --rm --name user2-read \
   weread-challenge:latest
 ```
 
+首次启动后, 需微信扫描二维码登录, 二维码保存在 `./data/login.png`
+
 ### 创建定时任务
 
-#### docker-compose
+#### docker-compose 方式
 
 ```bash
 WORKDIR=$HOME/weread-challenge
@@ -184,7 +186,7 @@ EOF
 (crontab -l 2>/dev/null; echo "00 07 * * *  cd $WORKDIR && docker compose up -d") | crontab -
 ```
 
-#### docker
+#### docker 方式
 
 ```bash
 # 启动浏览器
@@ -244,12 +246,10 @@ mkdir -p $HOME/Documents/weread-challenge
 cd $HOME/Documents/weread-challenge
 # 安装依赖
 npm install selenium-webdriver
-# 使能safari driver(可选)
-safaridriver --enable
 # 下载脚本
 wget https://storage1.techfetch.dev/weread-challenge/weread-challenge.js -O weread-challenge.js
 # 通过环境变量设置运行参数
-export WEREAD_BROWSER="safari"
+export WEREAD_BROWSER="chrome"
 # 运行
 node weread-challenge.js
 ```
@@ -291,24 +291,27 @@ Selenium_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}
 
 ## 可配置项
 
-| 环境变量                | 默认值           | 可选值                                | 说明             |
-| ----------------------- | ---------------- | ------------------------------------- | ---------------- |
-| `WEREAD_USER`           | `weread-default` | -                                     | 用户标识         |
-| `WEREAD_REMOTE_BROWSER` | ""               | -                                     | 远程浏览器地址   |
-| `WEREAD_DURATION`       | `10`             | -                                     | 阅读时长         |
-| `WEREAD_SPEED`          | `slow`           | `slow,normal,fast`                    | 阅读速度         |
-| `WEREAD_SELECTION`      | `random`         | [0-4]                                 | 选择阅读的书籍   |
-| `WEREAD_BROWSER`        | `chrome`         | `chrome,MicrosoftEdge,firefox,safari` | 浏览器           |
-| `ENABLE_EMAIL`          | `false`          | `true,false`                          | 邮件通知         |
-| `EMAIL_SMTP`            | ""               | -                                     | 邮箱 SMTP 服务器 |
-| `EMAIL_USER`            | ""               | -                                     | 邮箱用户名       |
-| `EMAIL_PASS`            | ""               | -                                     | 邮箱密码         |
-| `EMAIL_TO`              | ""               | -                                     | 收件人           |
-| `WEREAD_AGREE_TERMS`    | `true`           | `true,false`                          | 隐私同意条款     |
+| 环境变量                | 默认值           | 可选值                         | 说明             |
+| ----------------------- | ---------------- | ------------------------------ | ---------------- |
+| `WEREAD_USER`           | `weread-default` | -                              | 用户标识         |
+| `WEREAD_REMOTE_BROWSER` | ""               | -                              | 远程浏览器地址   |
+| `WEREAD_DURATION`       | `10`             | -                              | 阅读时长         |
+| `WEREAD_SPEED`          | `slow`           | `slow,normal,fast`             | 阅读速度         |
+| `WEREAD_SELECTION`      | `random`         | [0-4]                          | 选择阅读的书籍   |
+| `WEREAD_BROWSER`        | `chrome`         | `chrome,MicrosoftEdge,firefox` | 浏览器           |
+| `ENABLE_EMAIL`          | `false`          | `true,false`                   | 邮件通知         |
+| `EMAIL_SMTP`            | ""               | -                              | 邮箱 SMTP 服务器 |
+| `EMAIL_USER`            | ""               | -                              | 邮箱用户名       |
+| `EMAIL_PASS`            | ""               | -                              | 邮箱密码         |
+| `EMAIL_TO`              | ""               | -                              | 收件人           |
+| `WEREAD_AGREE_TERMS`    | `true`           | `true,false`                   | 隐私同意条款     |
 
-## 容器多架构支持
+<!-- ## 容器多架构支持
 
-支持 linux/amd64,linux/arm64, 支持树莓派等开发板.
+支持 `linux/amd64`,`linux/arm64`, 支持树莓派等开发板.
+
+> 注意: 本工具镜像支持 `arm64`, 但`selenium/standalone-chrome:4.26`镜像未编译 `arm64`, 需自行构建. 因此`arm64`架构不支持使用`docker-compose`方式运行.
+> 如需使用`arm64`, 需自行构建`arm64`的`selenium`, 或使用`docker`方式运行, 连接运行在`amd64`的`selenium`.
 
 ```bash
 docker buildx create --name weread-challenge
@@ -316,7 +319,7 @@ docker buildx use weread-challenge
 docker buildx inspect --bootstrap
 docker buildx build --platform linux/amd64,linux/arm64 -t jqknono/weread-challenge:base -f Dockerfile.base --push .
 docker buildx build --platform linux/amd64,linux/arm64 -t jqknono/weread-challenge:latest -f Dockerfile.quick --push .
-```
+``` -->
 
 ## 注意事项
 
@@ -341,5 +344,6 @@ docker buildx build --platform linux/amd64,linux/arm64 -t jqknono/weread-challen
 ## 参考
 
 - 脚本下载链接: [weread-challenge.js](https://storage1.techfetch.dev/weread-challenge/weread-challenge.js)
-- 文章来源: [https://blog.techfetch.dev](https://blog.techfetch.dev/blog/2024/12/05/%E5%BE%AE%E4%BF%A1%E8%AF%BB%E4%B9%A6%E8%87%AA%E5%8A%A8%E6%89%93%E5%8D%A1%E5%88%B7%E6%97%B6%E9%95%BF/)
+- 开源地址: [https://github.com/jqknono/weread-challenge-selenium](https://github.com/jqknono/weread-challenge-selenium)
 - 统计: [https://weread-challenge.techfetch.dev](https://weread-challenge.techfetch.dev)
+- 文章来源: [https://blog.techfetch.dev](https://blog.techfetch.dev/blog/2024/12/05/%E5%BE%AE%E4%BF%A1%E8%AF%BB%E4%B9%A6%E8%87%AA%E5%8A%A8%E6%89%93%E5%8D%A1%E5%88%B7%E6%97%B6%E9%95%BF/)
