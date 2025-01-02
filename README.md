@@ -42,6 +42,7 @@
 - 支持设置阅读时间
 - 支持邮件通知
 - 多平台支持: `linux | windows | macos`
+- 支持架构: `amd64`
 <!-- - 多架构支持: `amd64 | arm64` -->
 - 支持浏览器: `chrome | MicrosoftEdge | firefox`
 - 支持多用户
@@ -106,7 +107,8 @@ services:
       retries: 10
 ```
 
-保存为 `docker-compose.yml`, 运行 `docker compose up -d`.  
+保存为 `docker-compose.yml`, 运行 `docker compose up -d`.
+
 首次启动后, 需微信扫描二维码登录, 二维码保存在 `./data/login.png`
 
 ### Docker 运行
@@ -144,6 +146,11 @@ docker run --rm --name user2-read \
 首次启动后, 需微信扫描二维码登录, 二维码保存在 `./data/login.png`
 
 ### 创建定时任务
+
+有两种方式添加定时任务, `docker-compose 方式` 和 `docker 方式`.
+
+- `docker-compose 方式`, 通过 `docker-compose` 启动, 浏览器环境配置简单, 一键启动, 每个浏览器实例一个用户.
+- `docker 方式`, 通过 `docker` 启动, 工具需使用`远程浏览器特性`连接到浏览器实例, 浏览器环境可能需要自行调整, 支持单浏览器多用户.
 
 #### docker-compose 方式
 
