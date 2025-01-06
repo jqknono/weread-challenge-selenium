@@ -310,6 +310,7 @@ Selenium_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}
 | `EMAIL_SMTP`            | ""               | -                              | 邮箱 SMTP 服务器 |
 | `EMAIL_USER`            | ""               | -                              | 邮箱用户名       |
 | `EMAIL_PASS`            | ""               | -                              | 邮箱密码         |
+| `EMAIL_FROM`            | ""               | -                              | 发件人           |
 | `EMAIL_TO`              | ""               | -                              | 收件人           |
 | `WEREAD_AGREE_TERMS`    | `true`           | `true,false`                   | 隐私同意条款     |
 

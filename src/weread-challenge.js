@@ -36,6 +36,7 @@ const WEREAD_AGREE_TERMS = process.env.WEREAD_AGREE_TERMS === "true" || true; //
 // EMAIL_SMTP
 // EMAIL_USER
 // EMAIL_PASS
+// EMAIL_FROM
 // EMAIL_TO
 
 // create /data directory if not exists
@@ -268,8 +269,16 @@ async function sendMail(subject, text, filePaths = []) {
     contentType: `image/${path.extname(filePath).substring(1)}`, // Automatically detect image type
   }));
 
-  // Email options
-  let mailContent = `
+  // Use EMAIL_FROM if provided, otherwise fall back to EMAIL_USER
+  const fromAddress = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+
+  // Email options with updated from field
+  let mailOptions = {
+    from: fromAddress,
+    to: process.env.EMAIL_TO,
+    subject: subject,
+    attachments: attachments,
+    html: `
     <!DOCTYPE html>
     <html>
     <head>
@@ -293,12 +302,12 @@ async function sendMail(subject, text, filePaths = []) {
 
             <div class="image-gallery">
                 ${attachments
-                  .map(
-                    (att) => `
+        .map(
+          (att) => `
                     <img src="cid:${att.cid}" alt="Reading Progress" style="display: block; margin: 10px auto;"/>
                 `
-                  )
-                  .join("")}
+        )
+        .join("")}
             </div>
 
             <div style="margin: 20px 0;">
@@ -314,14 +323,7 @@ async function sendMail(subject, text, filePaths = []) {
         </div>
     </body>
     </html>
-`;
-  let mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: process.env.EMAIL_TO,
-    subject: subject,
-    // text: mailContent,
-    attachments: attachments,
-    html: mailContent,
+`,
   };
 
   try {
@@ -476,11 +478,11 @@ async function main() {
           driver
             .wait(until.elementLocated(locator1), 300000)
             .then(resolve)
-            .catch(() => {});
+            .catch(() => { });
           driver
             .wait(until.elementLocated(locator2), 300000)
             .then(resolve)
-            .catch(() => {});
+            .catch(() => { });
         }),
         300000 // 5 minutes
       );
