@@ -266,10 +266,15 @@ Docker 运行同 Linux.
 ## 多用户支持
 
 ```bash
+# 创建桥接网络
+docker network create --driver bridge --subnet=172.31.1.0/24 --gateway=172.31.1.1 weread-challenge-net
 # 启动浏览器
+Selenium_IP="172.31.1.2"
 docker run --restart always -d --name selenium-live \
   -v /var/run/docker.sock:/var/run/docker.sock \
   --shm-size="2g" \
+  --network weread-challenge-net \
+  --ip $Selenium_IP \
   -p 4444:4444 \
   -p 7900:7900 \
   -e SE_ENABLE_TRACING=false \
@@ -285,15 +290,12 @@ WEREAD_USER2="user2"
 mkdir -p $HOME/weread-challenge/$WEREAD_USER1/data
 mkdir -p $HOME/weread-challenge/$WEREAD_USER2/data
 
-# Get container IP
-Selenium_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' selenium-live)
-
 # 首次启动后, 需微信扫描二维码登录, 二维码保存在:
 # /$HOME/weread-challenge/${WEREAD_USER1}/data/login.png
 # /$HOME/weread-challenge/${WEREAD_USER2}/data/login.png
 # 每天早上 7 点启动, 阅读68分钟
-(crontab -l 2>/dev/null; echo "00 07 * * * docker run --rm --name ${WEREAD_USER1}-read -v $HOME/weread-challenge/${WEREAD_USER1}/data:/app/data -e WEREAD_REMOTE_BROWSER=http://${Selenium_IP}:4444 -e WEREAD_DURATION=68 -e WEREAD_USER=${WEREAD_USER1} jqknono/weread-challenge:latest") | crontab -
-(crontab -l 2>/dev/null; echo "00 07 * * * docker run --rm --name ${WEREAD_USER2}-read -v $HOME/weread-challenge/${WEREAD_USER2}/data:/app/data -e WEREAD_REMOTE_BROWSER=http://${Selenium_IP}:4444 -e WEREAD_DURATION=68 -e WEREAD_USER=${WEREAD_USER2} jqknono/weread-challenge:latest") | crontab -
+(crontab -l 2>/dev/null; echo "00 07 * * * docker run --rm --name ${WEREAD_USER1}-read -v $HOME/weread-challenge/${WEREAD_USER1}/data:/app/data --network weread-challenge-net -e WEREAD_REMOTE_BROWSER=http://${Selenium_IP}:4444 -e WEREAD_DURATION=68 -e WEREAD_USER=${WEREAD_USER1} jqknono/weread-challenge:latest") | crontab -
+(crontab -l 2>/dev/null; echo "00 07 * * * docker run --rm --name ${WEREAD_USER2}-read -v $HOME/weread-challenge/${WEREAD_USER2}/data:/app/data --network weread-challenge-net -e WEREAD_REMOTE_BROWSER=http://${Selenium_IP}:4444 -e WEREAD_DURATION=68 -e WEREAD_USER=${WEREAD_USER2} jqknono/weread-challenge:latest") | crontab -
 ```
 
 ## 可配置项
