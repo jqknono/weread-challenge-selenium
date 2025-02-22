@@ -15,7 +15,7 @@ const https = require("https");
 const http = require("http");
 const os = require("os");
 
-const WEREAD_VERSION = "0.2.0";
+const WEREAD_VERSION = "0.3.0";
 const COOKIE_FILE = "./data/cookies.json"; // Path to save/load cookies
 const LOGIN_QR_CODE = "./data/login.png"; // Path to save login QR code
 const URL = "https://weread.qq.com/"; // Replace with the target URL
@@ -24,10 +24,11 @@ const WEREAD_USER = process.env.WEREAD_USER || "weread-default"; // User to use
 const WEREAD_REMOTE_BROWSER = process.env.WEREAD_REMOTE_BROWSER;
 const WEREAD_DURATION = process.env.WEREAD_DURATION || 10; // Reading duration in minutes
 const WEREAD_SPEED = process.env.WEREAD_SPEED || "slow"; // Reading speed, slow | normal | fast
-const WEREAD_SELECTION = process.env.WEREAD_SELECTION || 0; // Selection method
+const WEREAD_SELECTION = process.env.WEREAD_SELECTION || 2; // Selection method
 const WEREAD_BROWSER = process.env.WEREAD_BROWSER || Browser.CHROME; // Browser to use, chrome | MicrosoftEdge | firefox
 const ENABLE_EMAIL = process.env.ENABLE_EMAIL === "true" || false; // Enable email notifications
 const WEREAD_AGREE_TERMS = process.env.WEREAD_AGREE_TERMS === "true" || true; // Agree to terms
+const EMAIL_PORT = parseInt(process.env.EMAIL_PORT) || 465; // SMTP port number, default 465
 // env vars:
 // WEREAD_REMOTE_BROWSER
 // WEREAD_DURATION
@@ -250,14 +251,19 @@ async function isElementInViewport(driver, element) {
 
 async function sendMail(subject, text, filePaths = []) {
   const nodemailer = require("nodemailer");
+  
+  // 根据端口自动判断是否使用SSL
+  // 通常 465 使用 SSL，587 和 25 不使用
+  const secure = EMAIL_PORT === 465;
+  
   // Create transporter object using SMTP transport
   let transporter = nodemailer.createTransport({
     host: process.env.EMAIL_SMTP,
-    port: 465,
-    secure: true, // true for 465, false for other ports
+    port: EMAIL_PORT,
+    secure: secure, // true for 465, false for other ports
     auth: {
-      user: process.env.EMAIL_USER, // Your email address
-      pass: process.env.EMAIL_PASS, // Your email password or app-specific password
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
     },
   });
 

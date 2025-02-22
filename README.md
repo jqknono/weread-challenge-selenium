@@ -223,6 +223,14 @@ Selenium_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}
 (crontab -l 2>/dev/null; echo "00 07 * * * docker run --rm --name ${WEREAD_USER}-read -v $HOME/weread-challenge/${WEREAD_USER}/data:/app/data -e WEREAD_REMOTE_BROWSER=http://${Selenium_IP}:4444 -e WEREAD_DURATION=68 -e WEREAD_USER=${WEREAD_USER} jqknono/weread-challenge:latest") | crontab -
 ```
 
+crontab 示例:
+
+```bash
+00 01 * * * docker run --rm --name user1-read -v /home/test/weread-challenge/user1/data:/app/data --network weread-challenge-net -e WEREAD_REMOTE_BROWSER=http://172.31.1.2:4444 -e WEREAD_DURATION=180 -e WEREAD_USER=user1 -e WEREAD_SELECTION=2 -e ENABLE_EMAIL=true -e EMAIL_SMTP=smtp.mail.me.com -e EMAIL_USER=user1@icloud.com -e EMAIL_PASS=aaaa-bbbb-cccc-dddd -e EMAIL_PORT=587 -e EMAIL_TO=weread-challege@outlook.com jqknono/weread-challenge:latest
+
+00 01 * * * docker run --rm --name user2-read -v /home/test/weread-challenge/user2/data:/app/data --network weread-challenge-net -e WEREAD_REMOTE_BROWSER=http://172.31.1.2:4444 -e WEREAD_DURATION=180 -e WEREAD_USER=user2 -e WEREAD_SELECTION=2 -e ENABLE_EMAIL=true -e EMAIL_SMTP=smtp.mail.me.com -e EMAIL_USER=user2@icloud.com -e EMAIL_PASS=aaaa-bbbb-cccc-dddd -e EMAIL_PORT=587 -e EMAIL_TO=weread-challege@outlook.com jqknono/weread-challenge:latest
+```
+
 ## Windows
 
 ```ps1
@@ -310,6 +318,7 @@ mkdir -p $HOME/weread-challenge/$WEREAD_USER2/data
 | `WEREAD_BROWSER`        | `chrome`         | `chrome,MicrosoftEdge,firefox` | 浏览器           |
 | `ENABLE_EMAIL`          | `false`          | `true,false`                   | 邮件通知         |
 | `EMAIL_SMTP`            | ""               | -                              | 邮箱 SMTP 服务器 |
+| `EMAIL_PORT`            | `465`            | `25,465,587`                   | 邮箱 SMTP 端口   |
 | `EMAIL_USER`            | ""               | -                              | 邮箱用户名       |
 | `EMAIL_PASS`            | ""               | -                              | 邮箱密码         |
 | `EMAIL_FROM`            | ""               | -                              | 发件人           |
