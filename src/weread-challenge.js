@@ -188,7 +188,11 @@ function getUserInfo() {
 }
 
 async function saveCookies(driver, filePath) {
-  const cookies = await driver.manage().getCookies();
+  let cookies = await driver.manage().getCookies();
+  // If using Safari, set secure to true for all cookies
+  if (WEREAD_BROWSER === Browser.SAFARI) {
+    cookies = cookies.map(cookie => ({ ...cookie, secure: true }));
+  }
   fs.writeFileSync(filePath, JSON.stringify(cookies, null, 2));
   console.info("Cookies saved successfully.");
 }
@@ -566,8 +570,9 @@ async function main() {
       await books[selection - 1].click();
       console.info("Clicked on the ", selection, "th book.");
     } else {
-      console.error("Book not found.");
-      return;
+      console.warn("No book link found. Using the default link.");
+      await driver.get("https://weread.qq.com/web/reader/276323e0813ab90a5g0144d7");
+      await driver.wait(until.titleContains("胆小如鼠"), 10000);
     }
 
     // get button with title equal to "目录"
@@ -751,8 +756,15 @@ async function main() {
       ]);
     }
   } catch (e) {
-    console.info(e);
-    const errorMessage = String(e?.message || e || "Unknown error");
+    // Add line number to error message if possible
+    let errorMessage = String(e?.message || e || "Unknown error");
+    if (e && e.stack) {
+      const match = e.stack.match(/(src\/main.js):(\d+):(\d+)/);
+      if (match) {
+        errorMessage += ` (at ${match[1]}:${match[2]})`;
+      }
+    }
+    console.info(errorMessage);
     if (ENABLE_EMAIL) {
       await sendMail("[项目进展--项目停滞]", "Error occurred: " + errorMessage);
     }

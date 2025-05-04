@@ -44,7 +44,7 @@
 - 多平台支持: `linux | windows | macos`
 - 支持架构: `amd64`
 <!-- - 多架构支持: `amd64 | arm64` -->
-- 支持浏览器: `chrome | MicrosoftEdge | firefox`
+- 支持浏览器: `chrome | MicrosoftEdge | firefox | safari`
 - 支持多用户
 - 异常时强制刷新
 - 使用统计
@@ -263,8 +263,10 @@ cd $HOME/Documents/weread-challenge
 npm install selenium-webdriver
 # 下载脚本
 wget https://storage1.techfetch.dev/weread-challenge/weread-challenge.js -O weread-challenge.js
+# 设置允许自动化
+sudo safaridriver --enable
 # 通过环境变量设置运行参数
-export WEREAD_BROWSER="chrome"
+export WEREAD_BROWSER="safari"
 # 运行
 node weread-challenge.js
 ```
