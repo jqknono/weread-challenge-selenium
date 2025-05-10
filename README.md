@@ -133,14 +133,14 @@ docker run --rm --name user-read \
   -v $HOME/weread-challenge/user/data:/app/data \
   -e WEREAD_REMOTE_BROWSER=http://172.17.0.2:4444 \
   -e WEREAD_DURATION=68 \
-  weread-challenge:latest
+  jqknono/weread-challenge:latest
 
 # add another user
 docker run --rm --name user2-read \
   -v $HOME/weread-challenge/user2/data:/app/data \
   -e WEREAD_REMOTE_BROWSER=http://172.17.0.2:4444 \
   -e WEREAD_DURATION=68 \
-  weread-challenge:latest
+  jqknono/weread-challenge:latest
 ```
 
 首次启动后, 需微信扫描二维码登录, 二维码保存在 `./data/login.png`
