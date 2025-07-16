@@ -1,0 +1,28 @@
+services:
+  app:
+    image: jqknono/weread-challenge:latest
+    pull_policy: always
+    environment:
+      - WEREAD_REMOTE_BROWSER=http://selenium:4444
+      - WEREAD_DURATION=68
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      selenium:
+        condition: service_healthy
+
+  selenium:
+    image: selenium/standalone-chrome:4.26
+    pull_policy: if_not_present
+    shm_size: 2gb
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - SE_ENABLE_TRACING=false
+      - SE_BIND_HOST=false
+      - SE_JAVA_DISABLE_HOSTNAME_VERIFICATION=false
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4444/wd/hub/status"]
+      interval: 5s
+      timeout: 60s
+      retries: 10

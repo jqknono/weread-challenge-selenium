@@ -1,23 +1,36 @@
 # 微信读书挑战会员助手
 
-只为便宜一点买微信读书会员.
+只为便宜一点买微信读书会员。
 
 ![只为便宜一点买微信读书会员](https://img1.techfetch.dev/blog/202412261741639.gif)
 
+## 快速开始
+
+```bash
+# 创建工作目录
+mkdir -p weread-challenge && cd weread-challenge
+
+# 下载配置文件
+wget https://raw.githubusercontent.com/jqknono/weread-challenge-selenium/main/docker-compose.yml
+
+# 启动服务
+docker compose up -d
+```
+
 ## 微信读书规则
 
-- 离线阅读计入总时长, 但需要联网上报
-- 网页版, 墨水屏, 小程序, 听书, 有声书收听**都计入总时长**
-- 对单次自动阅读或收听时长过长的行为, 平台将结合用户行为特征判断, **过长部分不计入总时长**
-- 当日阅读超过**5 分钟**才算作有效阅读天数
-- 付费 5 元立即获得 2 天会员, 后续 30 日内打卡 29 天, 读书时长超过 30 小时, 可获得 30 天会员和 30 书币
-- 付费 50 元立即获得 30 天会员, 后续 365 日内打卡 360 天, 读书时长超过 300 小时, 可获得 365 天会员和 500 书币
+- 离线阅读计入总时长，但需要联网上报
+- 网页版、墨水屏、小程序、听书、有声书收听**都计入总时长**
+- 对单次自动阅读或收听时长过长的行为，平台将结合用户行为特征判断，**过长部分不计入总时长**
+- 当日阅读超过 **5 分钟** 才算作有效阅读天数
+- 付费 5 元立即获得 2 天会员，后续 30 日内打卡 29 天，读书时长超过 30 小时，可获得 30 天会员和 30 书币
+- 付费 50 元立即获得 30 天会员，后续 365 日内打卡 360 天，读书时长超过 300 小时，可获得 365 天会员和 500 书币
 
-根据实际操作, 还有如下未明确说明的特点:
+根据实际操作，还有如下未明确说明的特点：
 
-- 第 29 日打卡后立即获得读书会员奖励, 并可立即开始下一轮挑战会员打卡, 无需等待第 31 日开始下一轮挑战, 第 29 日的打卡既算上一轮的打卡, 也算下一轮的打卡.
-- 除第一轮需 29 日外, 后续每 28 日即可获得 32 日会员, 1+28\*13=365, 一年可完成 13 轮, 花费 65 元, 获得 32\*13=416 天会员和 390 书币.
-- 更划算的仍然是年卡挑战会员, 但周期更长, 风险更大.
+- **打卡周期**：第 29 日打卡后立即获得读书会员奖励，并可立即开始下一轮挑战会员打卡，无需等待第 31 日开始下一轮挑战，第 29 日的打卡既算上一轮的打卡，也算下一轮的打卡
+- **年度计算**：除第一轮需 29 日外，后续每 28 日即可获得 32 日会员，1+28×13=365，一年可完成 13 轮，花费 65 元，获得 32×13=416 天会员和 390 书币
+- **性价比**：更划算的仍然是年卡挑战会员，但周期更长，风险更大
 
 ## 工具特性
 
@@ -54,25 +67,30 @@
 ### 直接运行
 
 ```bash
-# 安装nodejs
-sudo apt install nodejs
-# 老旧版本的 nodejs 需要安装 npm
-sudo apt install npm
+# 安装 Node.js 和 npm
+sudo apt update
+sudo apt install nodejs npm
+
 # 创建运行文件夹
 mkdir -p $HOME/Documents/weread-challenge
 cd $HOME/Documents/weread-challenge
+
 # 安装依赖
 npm install selenium-webdriver
+
 # 下载脚本
 wget https://storage1.techfetch.dev/weread-challenge/weread-challenge.js -O weread-challenge.js
-# 通过环境变量设置运行参数
+
+# 设置环境变量并运行
 export WEREAD_BROWSER="chrome"
-# 运行
-WEREAD_BROWSER="chrome" node weread-challenge.js
+node weread-challenge.js
 ```
 
-如需邮件通知, 需安装 _nodemailer_:
-`npm install nodemailer`
+如需邮件通知功能，需要额外安装 nodemailer：
+
+```bash
+npm install nodemailer
+```
 
 ### Docker Compose 运行
 
@@ -107,16 +125,21 @@ services:
       retries: 10
 ```
 
-保存为 `docker-compose.yml`, 运行 `docker compose up -d`.
+将以上内容保存为 `docker-compose.yml` 文件，然后运行：
 
-首次启动后, 需微信扫描二维码登录, 二维码保存在 `./data/login.png`
+```bash
+docker compose up -d
+```
+
+首次启动后，需要微信扫描二维码登录，二维码保存在 `./data/login.png`
 
 ### Docker 运行
 
 ```bash
-# create network
+# 创建网络
 docker network create weread-challenge-net
-# run selenium standalone
+
+# 启动 Selenium 服务
 docker run --restart always -d --name selenium-live \
   -v /var/run/docker.sock:/var/run/docker.sock \
   --shm-size="2g" \
@@ -132,14 +155,14 @@ docker run --restart always -d --name selenium-live \
   -e SE_NODE_OVERRIDE_MAX_SESSIONS=true \
   selenium/standalone-chrome:4.26
 
-# run weread-challenge
+# 运行微信读书挑战
 docker run --rm --name user-read \
   -v $HOME/weread-challenge/user/data:/app/data \
   -e WEREAD_REMOTE_BROWSER=http://selenium-live:4444 \
   -e WEREAD_DURATION=68 \
   jqknono/weread-challenge:latest
 
-# add another user
+# 添加第二个用户
 docker run --rm --name user2-read \
   -v $HOME/weread-challenge/user2/data:/app/data \
   -e WEREAD_REMOTE_BROWSER=http://selenium-live:4444 \
@@ -147,14 +170,14 @@ docker run --rm --name user2-read \
   jqknono/weread-challenge:latest
 ```
 
-首次启动后, 需微信扫描二维码登录, 二维码保存在 `./data/login.png`
+首次启动后，需要微信扫描二维码登录，二维码保存在 `./data/login.png`
 
 ### 创建定时任务
 
-有两种方式添加定时任务, `docker-compose 方式` 和 `docker 方式`.
+有两种方式添加定时任务：
 
-- `docker-compose 方式`, 通过 `docker-compose` 启动, 浏览器环境配置简单, 一键启动, 每个浏览器实例一个用户.
-- `docker 方式`, 通过 `docker` 启动, 工具需使用`远程浏览器特性`连接到浏览器实例, 浏览器环境可能需要自行调整, 支持单浏览器多用户.
+- **docker-compose 方式**：通过 `docker-compose` 启动，浏览器环境配置简单，一键启动，每个浏览器实例对应一个用户
+- **docker 方式**：通过 `docker` 启动，工具使用远程浏览器特性连接到浏览器实例，浏览器环境可能需要自行调整，支持单浏览器多用户
 
 #### docker-compose 方式
 
@@ -228,7 +251,7 @@ mkdir -p $HOME/weread-challenge/$WEREAD_USER/data
 (crontab -l 2>/dev/null; echo "00 07 * * * docker run --rm --name ${WEREAD_USER}-read -v $HOME/weread-challenge/${WEREAD_USER}/data:/app/data --network weread-challenge-net -e WEREAD_REMOTE_BROWSER=http://selenium-live:4444 -e WEREAD_DURATION=68 -e WEREAD_USER=${WEREAD_USER} jqknono/weread-challenge:latest") | crontab -
 ```
 
-crontab 示例:
+crontab 示例：
 
 ```bash
 00 01 * * * docker run --rm --name user1-read -v /home/test/weread-challenge/user1/data:/app/data --network weread-challenge-net -e WEREAD_REMOTE_BROWSER=http://selenium-live:4444 -e WEREAD_DURATION=180 -e WEREAD_USER=user1 -e WEREAD_SELECTION=2 -e ENABLE_EMAIL=true -e EMAIL_SMTP=smtp.mail.me.com -e EMAIL_USER=user1@icloud.com -e EMAIL_PASS=aaaa-bbbb-cccc-dddd -e EMAIL_PORT=587 -e EMAIL_TO=weread-challege@outlook.com jqknono/weread-challenge:latest
@@ -238,41 +261,48 @@ crontab 示例:
 
 ## Windows
 
-```ps1
-# 安装nodejs
-winget install -e --id Node.js.Node.js
+```powershell
+# 安装 Node.js
+winget install -e --id OpenJS.NodeJS.LTS
+
 # 创建运行文件夹
-mkdir -p $HOME/Documents/weread-challenge
-cd $HOME/Documents/weread-challenge
+New-Item -ItemType Directory -Force -Path "$HOME\Documents\weread-challenge"
+Set-Location "$HOME\Documents\weread-challenge"
+
 # 安装依赖
 npm install selenium-webdriver
-# 下载脚本powershell
+
+# 下载脚本
 Invoke-WebRequest -Uri https://storage1.techfetch.dev/weread-challenge/weread-challenge.js -OutFile weread-challenge.js
-# 通过环境变量设置运行参数
+
+# 设置环境变量并运行
 $env:WEREAD_BROWSER="MicrosoftEdge"
-# 运行
 node weread-challenge.js
 ```
 
-Docker 运行同 Linux.
+Docker 运行方式与 Linux 相同。
 
 ## MacOS
 
-```zsh
-# 安装nodejs
+```bash
+# 安装 Node.js
 brew install node
+
 # 创建运行文件夹
 mkdir -p $HOME/Documents/weread-challenge
 cd $HOME/Documents/weread-challenge
+
 # 安装依赖
 npm install selenium-webdriver
+
 # 下载脚本
 wget https://storage1.techfetch.dev/weread-challenge/weread-challenge.js -O weread-challenge.js
-# 设置允许自动化
+
+# 启用 Safari 自动化支持
 sudo safaridriver --enable
-# 通过环境变量设置运行参数
+
+# 设置环境变量并运行
 export WEREAD_BROWSER="safari"
-# 运行
 node weread-challenge.js
 ```
 
@@ -283,7 +313,8 @@ Docker 运行同 Linux.
 ```bash
 # 创建桥接网络
 docker network create weread-challenge-net
-# 启动浏览器
+
+# 启动浏览器服务
 docker run --restart always -d --name selenium-live \
   -v /var/run/docker.sock:/var/run/docker.sock \
   --shm-size="2g" \
@@ -299,15 +330,18 @@ docker run --restart always -d --name selenium-live \
   -e SE_NODE_OVERRIDE_MAX_SESSIONS=true \
   selenium/standalone-chrome:4.26
 
+# 设置用户名
 WEREAD_USER1="user1"
 WEREAD_USER2="user2"
+
+# 创建用户数据目录
 mkdir -p $HOME/weread-challenge/$WEREAD_USER1/data
 mkdir -p $HOME/weread-challenge/$WEREAD_USER2/data
 
-# 首次启动后, 需微信扫描二维码登录, 二维码保存在:
-# /$HOME/weread-challenge/${WEREAD_USER1}/data/login.png
-# /$HOME/weread-challenge/${WEREAD_USER2}/data/login.png
-# 每天早上 7 点启动, 阅读68分钟
+# 添加定时任务（每天早上 7 点启动，阅读 68 分钟）
+# 首次启动后需微信扫描二维码登录，二维码保存在：
+# $HOME/weread-challenge/${WEREAD_USER1}/data/login.png
+# $HOME/weread-challenge/${WEREAD_USER2}/data/login.png
 (crontab -l 2>/dev/null; echo "00 07 * * * docker run --rm --name ${WEREAD_USER1}-read -v $HOME/weread-challenge/${WEREAD_USER1}/data:/app/data --network weread-challenge-net -e WEREAD_REMOTE_BROWSER=http://selenium-live:4444 -e WEREAD_DURATION=68 -e WEREAD_USER=${WEREAD_USER1} jqknono/weread-challenge:latest") | crontab -
 (crontab -l 2>/dev/null; echo "00 07 * * * docker run --rm --name ${WEREAD_USER2}-read -v $HOME/weread-challenge/${WEREAD_USER2}/data:/app/data --network weread-challenge-net -e WEREAD_REMOTE_BROWSER=http://selenium-live:4444 -e WEREAD_DURATION=68 -e WEREAD_USER=${WEREAD_USER2} jqknono/weread-challenge:latest") | crontab -
 ```
@@ -348,23 +382,23 @@ docker buildx build --platform linux/amd64,linux/arm64 -t jqknono/weread-challen
 
 ## 注意事项
 
-- 28 日刷满 30 小时, 需每日至少 65 分钟, 而不是每日 60 分钟.
-- 微信读书统计可能会漏数分钟, 期望每日获得 65 分钟, 建议调整阅读时长到 68 分钟
-- 网页扫码登录 cookies 有效期为 30 天, 30 天后需重新扫码登录, 适合月挑战会员
-- 邮件通知可能被识别为垃圾邮件, 建议在收件方添加白名单
-- 本项目仅供学习交流使用, 请勿用于商业用途, 请勿用于违法用途
-- 如存在可能的侵权, 请联系 `weread-challenge@techfetch.dev`, 本项目会立即删除
+- **时长计算**：28 日刷满 30 小时，需每日至少 65 分钟，而不是每日 60 分钟
+- **统计误差**：微信读书统计可能会漏数分钟，期望每日获得 65 分钟，建议调整阅读时长到 68 分钟
+- **登录有效期**：网页扫码登录 cookies 有效期为 30 天，实测登录一次可以长期有效
+- **邮件通知**：邮件通知可能被识别为垃圾邮件，建议在收件方添加白名单
+- **使用声明**：本项目仅供学习交流使用，请勿用于商业用途，请勿用于违法用途
+- **侵权处理**：如存在可能的侵权，请联系 `weread-challenge@techfetch.dev`，本项目会立即删除
 
 ## 隐私政策
 
-- 隐私获取
-  - 本项目搜集使用者的 `cookies` 部分信息, 以用于使用者统计和展示.
-  - 搜集使用者的使用信息, 包含: `用户名称 | 首次使用时间 | 最近使用时间 | 总使用次数 | 浏览器类型 | 操作系统类别 | 阅读时长设置 | 异常退出原因`
-  - 如不希望被搜集任何信息, 可设置启动参数`WEREAD_AGREE_TERMS=false`
-- 风险提示
-  - `cookies` 可用于微信读书网页登录, 登录后可以执行书架操作, 但**本工具不会使用搜集的信息进行登录操作**.
-  - 腾讯保护机制确保异常登录时, 手机客户端将收到风险提示, 可在手机客户端`设置`->`登录设备`中确认登录设备.
-  - 本工具纯 js 实现, 容易反混淆和扩展, 第三方可以继续开发. 即使信任本工具, 也应在使用自动化工具时, 经常确认登录设备, 避免书架被恶意操作.
+- **隐私获取**
+  - 本项目搜集使用者的 `cookies` 部分信息，以用于使用者统计和展示
+  - 搜集使用者的使用信息，包含：`用户名称 | 首次使用时间 | 最近使用时间 | 总使用次数 | 浏览器类型 | 操作系统类别 | 阅读时长设置 | 异常退出原因`
+  - 如不希望被搜集任何信息，可设置启动参数 `WEREAD_AGREE_TERMS=false`
+- **风险提示**
+  - `cookies` 可用于微信读书网页登录，登录后可以执行书架操作，但**本工具不会使用搜集的信息进行登录操作**
+  - 腾讯保护机制确保异常登录时，手机客户端将收到风险提示，可在手机客户端 `设置` -> `登录设备` 中确认登录设备
+  - 本工具纯 JavaScript 实现，第三方可以继续开发。即使信任本工具，也应在使用自动化工具时，经常确认登录设备，避免书架被恶意操作
 
 ## 参考
 
