@@ -97,7 +97,7 @@ npm install nodemailer
 ```yaml
 services:
   app:
-    image: jqknono/weread-challenge:latest
+    image: registry.techfetch.dev/jqknono/weread-challenge:latest
     pull_policy: always
     environment:
       - WEREAD_REMOTE_BROWSER=http://selenium:4444
@@ -160,14 +160,14 @@ docker run --rm --name user-read \
   -v $HOME/weread-challenge/user/data:/app/data \
   -e WEREAD_REMOTE_BROWSER=http://selenium-live:4444 \
   -e WEREAD_DURATION=68 \
-  jqknono/weread-challenge:latest
+  registry.techfetch.dev/jqknono/weread-challenge:latest
 
 # 添加第二个用户
 docker run --rm --name user2-read \
   -v $HOME/weread-challenge/user2/data:/app/data \
   -e WEREAD_REMOTE_BROWSER=http://selenium-live:4444 \
   -e WEREAD_DURATION=68 \
-  jqknono/weread-challenge:latest
+  registry.techfetch.dev/jqknono/weread-challenge:latest
 ```
 
 首次启动后，需要微信扫描二维码登录，二维码保存在 `./data/login.png`
@@ -188,7 +188,7 @@ cd $WORKDIR
 cat > $WORKDIR/docker-compose.yml <<EOF
 services:
   app:
-    image: jqknono/weread-challenge:latest
+    image: registry.techfetch.dev/jqknono/weread-challenge:latest
     pull_policy: always
     environment:
       - WEREAD_REMOTE_BROWSER=http://selenium:4444
@@ -248,15 +248,15 @@ WEREAD_USER="user"
 mkdir -p $HOME/weread-challenge/$WEREAD_USER/data
 # 首次启动后, 需微信扫描二维码登录, 二维码保存在 $HOME/weread-challenge/$WEREAD_USER/data/login.png
 # 每天早上 7 点启动, 阅读68分钟
-(crontab -l 2>/dev/null; echo "00 07 * * * docker run --rm --name ${WEREAD_USER}-read -v $HOME/weread-challenge/${WEREAD_USER}/data:/app/data --network weread-challenge-net -e WEREAD_REMOTE_BROWSER=http://selenium-live:4444 -e WEREAD_DURATION=68 -e WEREAD_USER=${WEREAD_USER} jqknono/weread-challenge:latest") | crontab -
+(crontab -l 2>/dev/null; echo "00 07 * * * docker run --rm --name ${WEREAD_USER}-read -v $HOME/weread-challenge/${WEREAD_USER}/data:/app/data --network weread-challenge-net -e WEREAD_REMOTE_BROWSER=http://selenium-live:4444 -e WEREAD_DURATION=68 -e WEREAD_USER=${WEREAD_USER} registry.techfetch.dev/jqknono/weread-challenge:latest") | crontab -
 ```
 
 crontab 示例：
 
 ```bash
-00 01 * * * docker run --rm --name user1-read -v /home/test/weread-challenge/user1/data:/app/data --network weread-challenge-net -e WEREAD_REMOTE_BROWSER=http://selenium-live:4444 -e WEREAD_DURATION=180 -e WEREAD_USER=user1 -e WEREAD_SELECTION=2 -e ENABLE_EMAIL=true -e EMAIL_SMTP=smtp.mail.me.com -e EMAIL_USER=user1@icloud.com -e EMAIL_PASS=aaaa-bbbb-cccc-dddd -e EMAIL_PORT=587 -e EMAIL_TO=weread-challege@outlook.com jqknono/weread-challenge:latest
+00 01 * * * docker run --rm --name user1-read -v /home/test/weread-challenge/user1/data:/app/data --network weread-challenge-net -e WEREAD_REMOTE_BROWSER=http://selenium-live:4444 -e WEREAD_DURATION=180 -e WEREAD_USER=user1 -e WEREAD_SELECTION=2 -e ENABLE_EMAIL=true -e EMAIL_SMTP=smtp.mail.me.com -e EMAIL_USER=user1@icloud.com -e EMAIL_PASS=aaaa-bbbb-cccc-dddd -e EMAIL_PORT=587 -e EMAIL_TO=weread-challege@outlook.com registry.techfetch.dev/jqknono/weread-challenge:latest
 
-00 01 * * * docker run --rm --name user2-read -v /home/test/weread-challenge/user2/data:/app/data --network weread-challenge-net -e WEREAD_REMOTE_BROWSER=http://selenium-live:4444 -e WEREAD_DURATION=180 -e WEREAD_USER=user2 -e WEREAD_SELECTION=2 -e ENABLE_EMAIL=true -e EMAIL_SMTP=smtp.mail.me.com -e EMAIL_USER=user2@icloud.com -e EMAIL_PASS=aaaa-bbbb-cccc-dddd -e EMAIL_PORT=587 -e EMAIL_TO=weread-challege@outlook.com jqknono/weread-challenge:latest
+00 01 * * * docker run --rm --name user2-read -v /home/test/weread-challenge/user2/data:/app/data --network weread-challenge-net -e WEREAD_REMOTE_BROWSER=http://selenium-live:4444 -e WEREAD_DURATION=180 -e WEREAD_USER=user2 -e WEREAD_SELECTION=2 -e ENABLE_EMAIL=true -e EMAIL_SMTP=smtp.mail.me.com -e EMAIL_USER=user2@icloud.com -e EMAIL_PASS=aaaa-bbbb-cccc-dddd -e EMAIL_PORT=587 -e EMAIL_TO=weread-challege@outlook.com registry.techfetch.dev/jqknono/weread-challenge:latest
 ```
 
 ## Windows
@@ -342,8 +342,8 @@ mkdir -p $HOME/weread-challenge/$WEREAD_USER2/data
 # 首次启动后需微信扫描二维码登录，二维码保存在：
 # $HOME/weread-challenge/${WEREAD_USER1}/data/login.png
 # $HOME/weread-challenge/${WEREAD_USER2}/data/login.png
-(crontab -l 2>/dev/null; echo "00 07 * * * docker run --rm --name ${WEREAD_USER1}-read -v $HOME/weread-challenge/${WEREAD_USER1}/data:/app/data --network weread-challenge-net -e WEREAD_REMOTE_BROWSER=http://selenium-live:4444 -e WEREAD_DURATION=68 -e WEREAD_USER=${WEREAD_USER1} jqknono/weread-challenge:latest") | crontab -
-(crontab -l 2>/dev/null; echo "00 07 * * * docker run --rm --name ${WEREAD_USER2}-read -v $HOME/weread-challenge/${WEREAD_USER2}/data:/app/data --network weread-challenge-net -e WEREAD_REMOTE_BROWSER=http://selenium-live:4444 -e WEREAD_DURATION=68 -e WEREAD_USER=${WEREAD_USER2} jqknono/weread-challenge:latest") | crontab -
+(crontab -l 2>/dev/null; echo "00 07 * * * docker run --rm --name ${WEREAD_USER1}-read -v $HOME/weread-challenge/${WEREAD_USER1}/data:/app/data --network weread-challenge-net -e WEREAD_REMOTE_BROWSER=http://selenium-live:4444 -e WEREAD_DURATION=68 -e WEREAD_USER=${WEREAD_USER1} registry.techfetch.dev/jqknono/weread-challenge:latest") | crontab -
+(crontab -l 2>/dev/null; echo "00 07 * * * docker run --rm --name ${WEREAD_USER2}-read -v $HOME/weread-challenge/${WEREAD_USER2}/data:/app/data --network weread-challenge-net -e WEREAD_REMOTE_BROWSER=http://selenium-live:4444 -e WEREAD_DURATION=68 -e WEREAD_USER=${WEREAD_USER2} registry.techfetch.dev/jqknono/weread-challenge:latest") | crontab -
 ```
 
 ## 可配置项
@@ -377,7 +377,7 @@ docker buildx create --name weread-challenge
 docker buildx use weread-challenge
 docker buildx inspect --bootstrap
 docker buildx build --platform linux/amd64,linux/arm64 -t jqknono/weread-challenge:base -f Dockerfile.base --push .
-docker buildx build --platform linux/amd64,linux/arm64 -t jqknono/weread-challenge:latest -f Dockerfile.quick --push .
+docker buildx build --platform linux/amd64,linux/arm64 -t registry.techfetch.dev/jqknono/weread-challenge:latest -f Dockerfile.quick --push .
 ``` -->
 
 ## 注意事项
