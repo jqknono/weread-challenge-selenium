@@ -15,7 +15,7 @@ const https = require("https");
 const http = require("http");
 const os = require("os");
 
-const WEREAD_VERSION = "0.4.0";
+const WEREAD_VERSION = "0.5.0";
 const COOKIE_FILE = "./data/cookies.json"; // Path to save/load cookies
 const LOGIN_QR_CODE = "./data/login.png"; // Path to save login QR code
 const URL = "https://weread.qq.com/"; // Replace with the target URL
@@ -29,6 +29,8 @@ const WEREAD_BROWSER = process.env.WEREAD_BROWSER || Browser.CHROME; // Browser 
 const ENABLE_EMAIL = process.env.ENABLE_EMAIL === "true" || false; // Enable email notifications
 const WEREAD_AGREE_TERMS = process.env.WEREAD_AGREE_TERMS === "true" || true; // Agree to terms
 const EMAIL_PORT = parseInt(process.env.EMAIL_PORT) || 465; // SMTP port number, default 465
+const BARK_KEY = process.env.BARK_KEY || ""; // Bark推送密钥
+const BARK_SERVER = process.env.BARK_SERVER || "https://api.day.app"; // Bark服务器地址
 // env vars:
 // WEREAD_REMOTE_BROWSER
 // WEREAD_DURATION
@@ -39,6 +41,8 @@ const EMAIL_PORT = parseInt(process.env.EMAIL_PORT) || 465; // SMTP port number,
 // EMAIL_PASS
 // EMAIL_FROM
 // EMAIL_TO
+// BARK_KEY
+// BARK_SERVER
 
 // create /data directory if not exists
 if (!fs.existsSync("./data")) {
@@ -348,9 +352,94 @@ async function sendMail(subject, text, filePaths = []) {
   }
 }
 
+async function sendBark(title, body, options = {}) {
+  if (!BARK_KEY) {
+    console.info("Bark推送密钥未配置");
+    return false;
+  }
+
+  const {
+    subtitle = "",
+    sound = "alarm",
+    group = "WeRead-Challenge",
+    icon = "",
+    url = "",
+    level = "active"
+  } = options;
+
+  // 构建Bark推送URL
+  let barkUrl = `${BARK_SERVER}/${BARK_KEY}`;
+
+  // 根据参数构建URL
+  if (subtitle) {
+    barkUrl += `/${encodeURIComponent(title)}/${encodeURIComponent(subtitle)}/${encodeURIComponent(body)}`;
+  } else if (title && body) {
+    barkUrl += `/${encodeURIComponent(title)}/${encodeURIComponent(body)}`;
+  } else {
+    barkUrl += `/${encodeURIComponent(body)}`;
+  }
+
+  // 添加查询参数
+  const params = new URLSearchParams();
+  if (sound && sound !== "alarm") params.append("sound", sound);
+  if (group && group !== "WeRead-Challenge") params.append("group", group);
+  if (icon) params.append("icon", icon);
+  if (url) params.append("url", url);
+  if (level && level !== "active") params.append("level", level);
+
+  const paramString = params.toString();
+  if (paramString) {
+    barkUrl += `?${paramString}`;
+  }
+
+  console.info("发送Bark推送:", barkUrl);
+
+  try {
+    const httpModule = barkUrl.startsWith("https://") ? https : http;
+
+    const req = httpModule.request(barkUrl, {
+      method: "GET",
+      headers: {
+        "User-Agent": "WeRead-Tracker/1.0"
+      }
+    }, (res) => {
+      let responseData = "";
+
+      res.on("data", (chunk) => {
+        responseData += chunk;
+      });
+
+      res.on("end", () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          console.info("Bark推送发送成功");
+        } else {
+          console.error(`Bark推送失败: ${res.statusCode} - ${responseData}`);
+        }
+      });
+    });
+
+    req.on("error", (error) => {
+      console.error("Bark推送请求错误:", error.message);
+    });
+
+    req.end();
+    return true;
+  } catch (error) {
+    console.error("Bark推送异常:", error);
+    return false;
+  }
+}
+
 async function main() {
   console.info("Starting the script, datetime: ", new Date());
   let driver;
+
+  // 发送脚本启动通知
+  await sendBark("微信读书挑战", "自动阅读脚本开始运行", {
+    subtitle: "脚本启动",
+    level: "active",
+    sound: "beginning"
+  });
   try {
     const capabilities = {
       browserName: WEREAD_BROWSER,
@@ -540,6 +629,11 @@ async function main() {
       if (ENABLE_EMAIL) {
         await sendMail("[项目进展--项目停滞]", "Failed to login.");
       }
+      await sendBark("微信读书挑战", "登录失败", {
+        subtitle: "项目停滞",
+        level: "critical",
+        sound: "alarm"
+      });
       return;
     }
 
@@ -607,6 +701,11 @@ async function main() {
         "./data/screenshot.png",
       ]);
     }
+    await sendBark("微信读书挑战", "登录成功", {
+      subtitle: "项目启动",
+      level: "active",
+      sound: "birdsong"
+    });
 
     // run script to keep reading
     // let script = fs.readFileSync("./src/keep_reading.js", "utf8");
@@ -755,6 +854,11 @@ async function main() {
         "./data/screenshot.png",
       ]);
     }
+    await sendBark("微信读书挑战", `阅读完成，持续时间：${WEREAD_DURATION}分钟`, {
+      subtitle: "项目完成",
+      level: "active",
+      sound: "success"
+    });
   } catch (e) {
     // Add line number to error message if possible
     let errorMessage = String(e?.message || e || "Unknown error");
@@ -768,6 +872,11 @@ async function main() {
     if (ENABLE_EMAIL) {
       await sendMail("[项目进展--项目停滞]", "Error occurred: " + errorMessage);
     }
+    await sendBark("微信读书挑战", `发生错误：${errorMessage.substring(0, 100)}${errorMessage.length > 100 ? '...' : ''}`, {
+      subtitle: "项目停滞",
+      level: "critical",
+      sound: "alarm"
+    });
 
     if (WEREAD_AGREE_TERMS) {
       logEventToWereadLog(errorMessage);

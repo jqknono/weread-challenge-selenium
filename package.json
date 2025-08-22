@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "start": "node src/weread-challenge.js"
+  },
   "dependencies": {
     "nodemailer": "^6.9.16",
     "selenium-webdriver": "^4.27.0"
