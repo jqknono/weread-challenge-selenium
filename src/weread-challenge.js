@@ -31,6 +31,7 @@ const WEREAD_AGREE_TERMS = process.env.WEREAD_AGREE_TERMS === "true" || true; //
 const EMAIL_PORT = parseInt(process.env.EMAIL_PORT) || 465; // SMTP port number, default 465
 const BARK_KEY = process.env.BARK_KEY || ""; // Bark推送密钥
 const BARK_SERVER = process.env.BARK_SERVER || "https://api.day.app"; // Bark服务器地址
+const QR_EXPIRED_TEXTS = ["点击刷新二维码", "二维码已失效"]; // 登录二维码过期提示
 // env vars:
 // WEREAD_REMOTE_BROWSER
 // WEREAD_DURATION
@@ -285,6 +286,131 @@ async function findQRCodeElement(driver) {
       console.info("未找到二维码相关元素，可能已经登录");
       return false;
     }
+  }
+}
+
+// 安全点击元素函数，处理元素被拦截的情况
+async function safeClickElement(driver, element, description = "元素") {
+  try {
+    // 首先检查元素是否可见和可点击
+    const isDisplayed = await element.isDisplayed();
+    if (!isDisplayed) {
+      console.warn(`${description}不可见，尝试滚动到元素位置`);
+      await driver.executeScript("arguments[0].scrollIntoView({block: 'center'});", element);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    
+    // 尝试直接点击
+    await element.click();
+    console.info(`成功点击${description}`);
+    return true;
+  } catch (error) {
+    console.warn(`直接点击${description}失败: ${error.message}`);
+    
+    try {
+      // 尝试使用JavaScript点击
+      console.info(`尝试使用JavaScript点击${description}`);
+      await driver.executeScript("arguments[0].click();", element);
+      console.info(`使用JavaScript成功点击${description}`);
+      return true;
+    } catch (jsError) {
+      console.warn(`使用JavaScript点击${description}失败: ${jsError.message}`);
+      
+      try {
+        // 尝试使用Actions类模拟点击
+        console.info(`尝试使用Actions类点击${description}`);
+        const actions = driver.actions({ bridge: true });
+        await actions.move({ origin: element }).click().perform();
+        console.info(`使用Actions类成功点击${description}`);
+        return true;
+      } catch (actionError) {
+        console.error(`所有点击方法都失败: ${actionError.message}`);
+        return false;
+      }
+    }
+  }
+}
+
+// 刷新二维码的函数
+async function refreshQRCode(driver) {
+  try {
+    console.info("开始刷新二维码...");
+    
+    // 尝试多种方式找到刷新按钮
+    const refreshLocators = [
+      By.css(".login_dialog_retry_delegate"),
+      By.xpath("//div[contains(@class, 'login_dialog_retry_delegate')]"),
+      By.xpath("//div[contains(text(), '点击刷新二维码') and @class='wr_login_modal_qr_overlay_text']"),
+      By.xpath("//div[contains(text(), '点击刷新二维码')]"),
+      By.xpath("//div[@class='login_dialog_retry_delegate']"),
+      By.xpath("//div[contains(@class, 'refresh') or contains(@class, 'retry')]"),
+      By.xpath("//button[contains(text(), '刷新')]"),
+      By.xpath("//span[contains(text(), '刷新')]")
+    ];
+    
+    let refreshClicked = false;
+    let refreshElement = null;
+    
+    // 尝试每个定位器
+    for (const locator of refreshLocators) {
+      try {
+        refreshElement = await driver.wait(until.elementLocated(locator), 2000);
+        if (refreshElement) {
+          console.info(`找到刷新元素，尝试点击: ${locator.toString()}`);
+          refreshClicked = await safeClickElement(driver, refreshElement, "刷新按钮");
+          if (refreshClicked) {
+            try {
+              await driver.wait(until.stalenessOf(refreshElement), 3000);
+            } catch (waitError) {
+              console.debug(`刷新元素可能未及时从DOM移除: ${waitError.message}`);
+            }
+            break;
+          }
+        }
+      } catch (e) {
+        console.debug(`未找到元素: ${locator.toString()}`);
+      }
+    }
+    
+    if (!refreshClicked) {
+      console.warn("常规定位失败，尝试执行脚本触发刷新");
+      try {
+        const jsClicked = await driver.executeScript(
+          "const delegate = document.querySelector('.login_dialog_retry_delegate'); if (delegate) { delegate.click(); return true; } return false;"
+        );
+        if (!jsClicked) {
+          console.error("无法找到或点击任何刷新按钮");
+          return false;
+        }
+        refreshClicked = true;
+      } catch (scriptError) {
+        console.error(`执行脚本触发刷新失败: ${scriptError.message}`);
+        return false;
+      }
+    }
+    
+    // 等待页面加载
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    
+    // 检查二维码是否已刷新
+    let qrElementFound = await findQRCodeElement(driver);
+    
+    if (qrElementFound) {
+      // 避免截图时二维码还未弹出
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // 保存截图
+      await driver.takeScreenshot().then((image, err) => {
+        fs.writeFileSync(LOGIN_QR_CODE, image, "base64");
+      });
+      console.info("QR code refreshed, datetime: ", new Date());
+      return true;
+    } else {
+      console.error("刷新后未能找到任何二维码相关元素");
+      return false;
+    }
+  } catch (error) {
+    console.error("刷新二维码过程中发生错误:", error.message);
+    return false;
   }
 }
 
@@ -640,29 +766,26 @@ async function main() {
         break;
       }
 
-      // if text contains "点击刷新二维码", then click on it
-      if (text.includes("点击刷新二维码")) {
+      // 如果出现二维码过期提示，则自动刷新
+      if (QR_EXPIRED_TEXTS.some((expiredText) => text.includes(expiredText))) {
         console.info("Refreshing QR code...");
-        await element.click();
+        let refreshSuccess = await refreshQRCode(driver);
 
-        // 等待页面加载
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        
-        // 使用简化的二维码定位函数
-        let qrElementFound = await findQRCodeElement(driver);
-        
-        // 如果找到任何二维码相关元素，保存截图
-        if (qrElementFound) {
-          // 避免截图时二维码还未弹出
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          // save screenshot
-          await driver.takeScreenshot().then((image, err) => {
-            fs.writeFileSync(LOGIN_QR_CODE, image, "base64");
-          });
-
-          console.info("QR code refreshed, datetime: ", new Date());
-        } else {
-          console.error("刷新后未能找到任何二维码相关元素");
+        if (!refreshSuccess) {
+          console.error("二维码刷新失败，尝试其他方法...");
+          // 如果刷新失败，尝试直接刷新页面
+          await driver.navigate().refresh();
+          await new Promise((resolve) => setTimeout(resolve, 3000));
+          
+          // 再次检查二维码
+          let qrElementFound = await findQRCodeElement(driver);
+          if (qrElementFound) {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            await driver.takeScreenshot().then((image, err) => {
+              fs.writeFileSync(LOGIN_QR_CODE, image, "base64");
+            });
+            console.info("页面刷新后找到二维码, datetime: ", new Date());
+          }
         }
         continue;
       }
