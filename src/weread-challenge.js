@@ -815,25 +815,48 @@ async function main() {
 
     // Find the first div with class "wr_index_mini_shelf_card"
     let selection = Number(WEREAD_SELECTION);
-    if (selection === 0) {
-      // random selection between 1 and 4
-      selection = Math.floor(Math.random() * 4) + 1;
-    }
-    let books = await driver.findElements(
-      // By.xpath("(//div[@class='wr_index_mini_shelf_card'])[" + selection + "]"),
-      By.xpath("//div[@class='wr_index_mini_shelf_card']"),
-      10000
-    );
-    if (books.length > 0 && books.length < selection) {
-      await books[0].click();
-      console.info("Clicked on the first book.");
-    } else if (books.length >= selection) {
-      await books[selection - 1].click();
-      console.info("Clicked on the ", selection, "th book.");
-    } else {
-      console.warn("No book link found. Using the default link.");
-      await driver.get("https://weread.qq.com/web/reader/276323e0813ab90a5g0144d7");
+    const DEFAULT_MOUSE_BOOK_URL = "https://weread.qq.com/web/reader/276323e0813ab90a5g0144d7";
+
+    if (selection === -1) {
+      console.info("WEREAD_SELECTION=-1，尝试打开《胆小如鼠》。");
+      const targetBookCards = await driver.findElements(
+        By.xpath("//div[@class='wr_index_mini_shelf_card' and .//div[contains(text(), '胆小如鼠')]]"),
+        5000
+      );
+
+      if (targetBookCards.length > 0) {
+        const clickResult = await safeClickElement(driver, targetBookCards[0], "《胆小如鼠》书籍卡片");
+        if (!clickResult) {
+          console.warn("点击《胆小如鼠》卡片失败，改为直接跳转链接。");
+          await driver.get(DEFAULT_MOUSE_BOOK_URL);
+        }
+      } else {
+        console.warn("未在书架找到《胆小如鼠》，直接跳转阅读链接。");
+        await driver.get(DEFAULT_MOUSE_BOOK_URL);
+      }
+
       await driver.wait(until.titleContains("胆小如鼠"), 10000);
+    } else {
+      if (selection === 0) {
+        // random selection between 1 and 4
+        selection = Math.floor(Math.random() * 4) + 1;
+      }
+      let books = await driver.findElements(
+        // By.xpath("(//div[@class='wr_index_mini_shelf_card'])[" + selection + "]"),
+        By.xpath("//div[@class='wr_index_mini_shelf_card']"),
+        10000
+      );
+      if (books.length > 0 && books.length < selection) {
+        await books[0].click();
+        console.info("Clicked on the first book.");
+      } else if (books.length >= selection) {
+        await books[selection - 1].click();
+        console.info("Clicked on the ", selection, "th book.");
+      } else {
+        console.warn("No book link found. Using the default link.");
+        await driver.get(DEFAULT_MOUSE_BOOK_URL);
+        await driver.wait(until.titleContains("胆小如鼠"), 10000);
+      }
     }
 
     // get button with title equal to "目录"

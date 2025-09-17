@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "start": "WEREAD_REMOTE_BROWSER=http://172.18.0.2:4444 node src/weread-challenge.js"
+    "start": "WEREAD_SELECTION=-1 WEREAD_REMOTE_BROWSER=http://172.18.0.2:4444 node src/weread-challenge.js"
   },
   "dependencies": {
     "nodemailer": "^6.9.16",
