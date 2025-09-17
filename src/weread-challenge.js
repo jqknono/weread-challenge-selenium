@@ -257,6 +257,37 @@ async function isElementInViewport(driver, element) {
   );
 }
 
+// 简化的二维码定位函数
+async function findQRCodeElement(driver) {
+  try {
+    console.info("正在查找二维码登录元素...");
+    // 使用更精确的定位策略，优先查找二维码图片
+    const qrCodeImg = await driver.wait(
+      until.elementLocated(
+        By.xpath("//img[contains(@class, 'qr') or contains(@src, 'qr') or contains(@alt, '二维码')]")
+      ),
+      3000
+    );
+    console.info("找到二维码图片元素");
+    return true;
+  } catch (e) {
+    try {
+      // 备选方案：查找包含"扫码"或"二维码"文本的元素
+      await driver.wait(
+        until.elementLocated(
+          By.xpath("//*[contains(text(), '扫码') or contains(text(), '二维码')]")
+        ),
+        3000
+      );
+      console.info("找到包含'扫码'或'二维码'文本的元素");
+      return true;
+    } catch (e) {
+      console.info("未找到二维码相关元素，可能已经登录");
+      return false;
+    }
+  }
+}
+
 async function sendMail(subject, text, filePaths = []) {
   const nodemailer = require("nodemailer");
   
@@ -478,9 +509,14 @@ async function main() {
         options.addArguments("--disable-popup-blocking");
         // check if WEREAD_REMOTE_BROWSER is empty
         if (WEREAD_REMOTE_BROWSER) {
-          console.info("WEREAD_REMOTE_BROWSER: ", WEREAD_REMOTE_BROWSER);
+          // Ensure the remote browser URL has a protocol
+          let remoteBrowserUrl = WEREAD_REMOTE_BROWSER;
+          if (!remoteBrowserUrl.startsWith("http://") && !remoteBrowserUrl.startsWith("https://")) {
+            remoteBrowserUrl = "http://" + remoteBrowserUrl;
+          }
+          console.info("WEREAD_REMOTE_BROWSER: ", remoteBrowserUrl);
           driver = await new Builder()
-            .usingServer(WEREAD_REMOTE_BROWSER)
+            .usingServer(remoteBrowserUrl)
             .forBrowser(WEREAD_BROWSER)
             .withCapabilities(capabilities)
             .setChromeOptions(options)
@@ -546,20 +582,26 @@ async function main() {
       // 避免点击不成功
       await new Promise((resolve) => setTimeout(resolve, 1000));
       await loginLinks[0].click();
-      // if div contains text "扫码登录微信读书" then get screenshot
-      await driver.wait(
-        until.elementLocated(
-          By.xpath("//div[contains(text(), '扫码登录微信读书')]")
-        ),
-        10000
-      );
-      // 避免截图时二维码还未弹出
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      // save screenshot of QR code
-      await driver.takeScreenshot().then((image, err) => {
-        fs.writeFileSync(LOGIN_QR_CODE, image, "base64");
-      });
-      console.info("QR code saved, datetime: ", new Date());
+      
+      // 等待页面加载
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      
+      // 使用简化的二维码定位函数
+      let qrElementFound = await findQRCodeElement(driver);
+      
+      // 如果找到任何二维码相关元素，保存截图
+      if (qrElementFound) {
+        // 避免截图时二维码还未弹出
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        // save screenshot of QR code
+        await driver.takeScreenshot().then((image, err) => {
+          fs.writeFileSync(LOGIN_QR_CODE, image, "base64");
+        });
+        console.info("QR code saved, datetime: ", new Date());
+        
+      } else {
+        console.error("未能找到任何二维码相关元素");
+      }
     }
 
     let locator1 = By.xpath(
@@ -603,23 +645,25 @@ async function main() {
         console.info("Refreshing QR code...");
         await element.click();
 
-        // if div contains text "扫码登录微信读书" then get screenshot
-        await driver.wait(
-          until.elementLocated(
-            By.xpath("//div[contains(text(), '扫码登录微信读书')]")
-          ),
-          10000
-        );
+        // 等待页面加载
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        
+        // 使用简化的二维码定位函数
+        let qrElementFound = await findQRCodeElement(driver);
+        
+        // 如果找到任何二维码相关元素，保存截图
+        if (qrElementFound) {
+          // 避免截图时二维码还未弹出
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          // save screenshot
+          await driver.takeScreenshot().then((image, err) => {
+            fs.writeFileSync(LOGIN_QR_CODE, image, "base64");
+          });
 
-        // 避免截图时二维码还未弹出
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
-        // save screenshot
-        await driver.takeScreenshot().then((image, err) => {
-          fs.writeFileSync(LOGIN_QR_CODE, image, "base64");
-        });
-
-        console.info("QR code refreshed, datetime: ", new Date());
+          console.info("QR code refreshed, datetime: ", new Date());
+        } else {
+          console.error("刷新后未能找到任何二维码相关元素");
+        }
         continue;
       }
     }
