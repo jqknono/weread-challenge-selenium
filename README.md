@@ -8,13 +8,18 @@
 
 ```bash
 # 创建工作目录
-mkdir -p weread-challenge && cd weread-challenge
+mkdir -p $HOME/weread-challenge && cd $HOME/weread-challenge
 
 # 下载配置文件
 wget https://raw.githubusercontent.com/jqknono/weread-challenge-selenium/main/docker-compose.yml
 
 # 启动服务
 docker compose up -d
+
+# 创建定时任务
+(crontab -l 2>/dev/null; echo "00 07 * * *  cd $HOME/weread-challenge && docker compose up -d") | crontab -
+
+# 扫描$HOME/weread-challenge/data下生成的登录二维码, 开始自动阅读
 ```
 
 ## 微信读书规则
