@@ -13,6 +13,7 @@ const fs = require("fs");
 const path = require("path");
 const https = require("https");
 const http = require("http");
+const { execSync, spawnSync } = require("child_process");
 const os = require("os");
 
 const WEREAD_VERSION = "0.9.0";
@@ -74,6 +75,146 @@ function redirectConsole(method) {
 // Redirect all major console methods
 if (!DEBUG) {
   ["info", "warn", "error"].forEach(redirectConsole);
+}
+
+// --- 诊断与健康检查工具函数 ---
+function isHttpUrl(str) {
+  try {
+    const u = new URL(str);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch (_) {
+    return false;
+  }
+}
+
+async function fetchJson(url, timeoutMs = 3000) {
+  return await new Promise((resolve, reject) => {
+    const client = url.startsWith("https:") ? https : http;
+    const req = client.get(url, { timeout: timeoutMs }, (res) => {
+      let data = "";
+      res.on("data", (chunk) => (data += chunk));
+      res.on("end", () => {
+        try {
+          resolve({ statusCode: res.statusCode, body: JSON.parse(data || "{}") });
+        } catch (e) {
+          resolve({ statusCode: res.statusCode, body: data });
+        }
+      });
+    });
+    req.on("timeout", () => {
+      req.destroy(new Error("request timeout"));
+    });
+    req.on("error", reject);
+  });
+}
+
+async function checkSeleniumHealth(remoteUrl) {
+  try {
+    if (!remoteUrl || !isHttpUrl(remoteUrl)) {
+      console.warn("跳过健康检查：WEREAD_REMOTE_BROWSER 未设置或非法。");
+      return null;
+    }
+    // 优先 /status，兼容 /wd/hub/status
+    const base = remoteUrl.endsWith("/") ? remoteUrl.slice(0, -1) : remoteUrl;
+    const endpoints = ["/status", "/wd/hub/status"];
+    for (const ep of endpoints) {
+      try {
+        const { statusCode, body } = await fetchJson(`${base}${ep}`, 3000);
+        if (statusCode >= 200 && statusCode < 300) {
+          const ready = body?.ready ?? body?.value?.ready;
+          console.info(`Selenium 健康检查 ${ep} 响应: ready=${ready}`);
+          return { endpoint: ep, ready, raw: body };
+        }
+      } catch (_) {
+        // 继续尝试下一个端点
+      }
+    }
+    console.warn("Selenium 健康检查失败：所有端点无有效响应。");
+    return null;
+  } catch (e) {
+    console.warn("Selenium 健康检查异常：", e.message || e);
+    return null;
+  }
+}
+
+function dockerAvailable() {
+  try {
+    const out = spawnSync("docker", ["version"], { encoding: "utf8" });
+    return out.status === 0;
+  } catch (_) {
+    return false;
+  }
+}
+
+function findSeleniumContainers() {
+  try {
+    const out = execSync(
+      'docker ps --format "{{.ID}}\t{{.Image}}\t{{.Names}}"',
+      { encoding: "utf8" }
+    );
+    const lines = out.split(/\r?\n/).filter(Boolean);
+    const hits = lines
+      .map((l) => {
+        const [id, image, name] = l.split(/\t/);
+        return { id, image, name };
+      })
+      .filter((x) =>
+        /selenium\/(standalone-|node-).*chrome/i.test(x.image || "") ||
+        /selenium/i.test(x.name || "")
+      );
+    return hits;
+  } catch (e) {
+    console.warn("查找 Selenium 容器失败：", e.message || e);
+    return [];
+  }
+}
+
+function collectSeleniumLogs(tail = 300) {
+  try {
+    if (!dockerAvailable()) {
+      console.warn("Docker 不可用，跳过 selenium 日志抓取。");
+      return null;
+    }
+    const containers = findSeleniumContainers();
+    if (!containers.length) {
+      console.warn("未发现运行中的 selenium 容器，跳过日志抓取。");
+      return null;
+    }
+    const ts = new Date()
+      .toISOString()
+      .replace(/[:.]/g, "-")
+      .replace("T", "_")
+      .replace("Z", "");
+    const outFile = path.join("./data", `selenium-logs-${ts}.log`);
+    let combined = "";
+    for (const c of containers) {
+      try {
+        const logs = execSync(`docker logs --tail=${tail} ${c.id} 2>&1`, {
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "pipe"],
+        });
+        combined += `\n===== CONTAINER ${c.name} (${c.image}) =====\n` + logs;
+      } catch (e) {
+        combined += `\n===== CONTAINER ${c.name} (${c.image}) 日志获取失败: ${e.message} =====\n`;
+      }
+    }
+    fs.writeFileSync(outFile, combined, "utf8");
+    console.info("已抓取 selenium 容器日志:", outFile);
+    return outFile;
+  } catch (e) {
+    console.warn("保存 selenium 日志失败：", e.message || e);
+    return null;
+  }
+}
+
+async function collectDiagnostics(reason) {
+  try {
+    console.warn("开始收集诊断信息，原因：", reason?.toString()?.slice(0, 180) || "未知");
+    await checkSeleniumHealth(WEREAD_REMOTE_BROWSER);
+    collectSeleniumLogs(400);
+  } catch (_) {
+    // 忽略诊断过程错误
+  }
 }
 
 function getOSInfo() {
@@ -600,6 +741,7 @@ async function main() {
   try {
     const capabilities = {
       browserName: WEREAD_BROWSER,
+      pageLoadStrategy: 'eager',
     };
 
     var browser;
@@ -635,6 +777,8 @@ async function main() {
         options.addArguments("--disable-popup-blocking");
         // check if WEREAD_REMOTE_BROWSER is empty
         if (WEREAD_REMOTE_BROWSER) {
+          // 远端启动前做一次健康检查
+          await checkSeleniumHealth(WEREAD_REMOTE_BROWSER);
           // Ensure the remote browser URL has a protocol
           let remoteBrowserUrl = WEREAD_REMOTE_BROWSER;
           if (!remoteBrowserUrl.startsWith("http://") && !remoteBrowserUrl.startsWith("https://")) {
@@ -668,6 +812,13 @@ async function main() {
       default:
         break;
     }
+
+    // 全局超时配置，避免单次命令长时间挂起
+    await driver.manage().setTimeouts({
+      implicit: 5000,
+      pageLoad: 60000,
+      script: 30000,
+    });
 
     console.info("Browser launched successfully.");
 
@@ -1059,6 +1210,8 @@ async function main() {
       }
     }
     console.info(errorMessage);
+    // 出错时抓取 selenium 健康状态与容器日志
+    await collectDiagnostics(errorMessage);
     if (ENABLE_EMAIL) {
       await sendMail("[项目进展--项目停滞]", "Error occurred: " + errorMessage);
     }
