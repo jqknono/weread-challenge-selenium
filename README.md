@@ -17,7 +17,7 @@ wget https://raw.githubusercontent.com/jqknono/weread-challenge-selenium/main/do
 docker compose up -d
 
 # 创建定时任务
-(crontab -l 2>/dev/null; echo "00 07 * * *  cd $HOME/weread-challenge && docker compose up -d") | crontab -
+(crontab -l 2>/dev/null; echo "00 */6 * * *  cd $HOME/weread-challenge && docker compose up -d") | crontab -
 
 # 扫描$HOME/weread-challenge/data下生成的登录二维码, 开始自动阅读
 ```
@@ -85,7 +85,7 @@ cd $HOME/Documents/weread-challenge
 npm install selenium-webdriver
 
 # 下载脚本
-wget https://storage1.techfetch.dev/weread-challenge/weread-challenge.js -O weread-challenge.js
+wget https://raw.githubusercontent.com/jqknono/weread-challenge-selenium/refs/heads/main/src/weread-challenge.js -O weread-challenge.js
 
 # 设置环境变量并运行
 export WEREAD_BROWSER="chrome"
@@ -232,8 +232,8 @@ services:
       retries: 10
 EOF
 # 首次启动后, 需微信扫描二维码登录, 二维码保存在 $HOME/weread-challenge/data/login.png
-# 每天早上 7 点启动, 阅读68分钟
-(crontab -l 2>/dev/null; echo "00 07 * * *  cd $WORKDIR && docker compose up -d") | crontab -
+# 每隔6个小时, 阅读68分钟
+(crontab -l 2>/dev/null; echo "00 */6 * * *  cd $WORKDIR && docker compose up -d") | crontab -
 ```
 
 #### docker 方式
@@ -263,8 +263,8 @@ docker run --restart always -d --name selenium-live \
 WEREAD_USER="user"
 mkdir -p $HOME/weread-challenge/$WEREAD_USER/data
 # 首次启动后, 需微信扫描二维码登录, 二维码保存在 $HOME/weread-challenge/$WEREAD_USER/data/login.png
-# 每天早上 7 点启动, 阅读68分钟
-(crontab -l 2>/dev/null; echo "00 07 * * * docker run --rm --name ${WEREAD_USER}-read -v $HOME/weread-challenge/${WEREAD_USER}/data:/app/data --network weread-challenge-net -e WEREAD_REMOTE_BROWSER=http://selenium-live:4444 -e WEREAD_DURATION=68 -e WEREAD_USER=${WEREAD_USER} registry.techfetch.dev/jqknono/weread-challenge:latest") | crontab -
+# 每隔6个小时, 阅读68分钟
+(crontab -l 2>/dev/null; echo "00 */6 * * * docker run --rm --name ${WEREAD_USER}-read -v $HOME/weread-challenge/${WEREAD_USER}/data:/app/data --network weread-challenge-net -e WEREAD_REMOTE_BROWSER=http://selenium-live:4444 -e WEREAD_DURATION=68 -e WEREAD_USER=${WEREAD_USER} registry.techfetch.dev/jqknono/weread-challenge:latest") | crontab -
 ```
 
 crontab 示例：
@@ -292,7 +292,7 @@ Set-Location "$HOME\Documents\weread-challenge"
 npm install selenium-webdriver
 
 # 下载脚本
-Invoke-WebRequest -Uri https://storage1.techfetch.dev/weread-challenge/weread-challenge.js -OutFile weread-challenge.js
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/jqknono/weread-challenge-selenium/refs/heads/main/src/weread-challenge.js -OutFile weread-challenge.js
 
 # 设置环境变量并运行
 $env:WEREAD_BROWSER="MicrosoftEdge"
@@ -315,7 +315,7 @@ cd $HOME/Documents/weread-challenge
 npm install selenium-webdriver
 
 # 下载脚本
-wget https://storage1.techfetch.dev/weread-challenge/weread-challenge.js -O weread-challenge.js
+wget https://raw.githubusercontent.com/jqknono/weread-challenge-selenium/refs/heads/main/src/weread-challenge.js -O weread-challenge.js
 
 # 启用 Safari 自动化支持
 sudo safaridriver --enable
@@ -357,12 +357,12 @@ WEREAD_USER2="user2"
 mkdir -p $HOME/weread-challenge/$WEREAD_USER1/data
 mkdir -p $HOME/weread-challenge/$WEREAD_USER2/data
 
-# 添加定时任务（每天早上 7 点启动，阅读 68 分钟）
+# 添加定时任务（每隔6个小时，阅读 68 分钟）
 # 首次启动后需微信扫描二维码登录，二维码保存在：
 # $HOME/weread-challenge/${WEREAD_USER1}/data/login.png
 # $HOME/weread-challenge/${WEREAD_USER2}/data/login.png
-(crontab -l 2>/dev/null; echo "00 07 * * * docker run --rm --name ${WEREAD_USER1}-read -v $HOME/weread-challenge/${WEREAD_USER1}/data:/app/data --network weread-challenge-net -e WEREAD_REMOTE_BROWSER=http://selenium-live:4444 -e WEREAD_DURATION=68 -e WEREAD_USER=${WEREAD_USER1} registry.techfetch.dev/jqknono/weread-challenge:latest") | crontab -
-(crontab -l 2>/dev/null; echo "00 07 * * * docker run --rm --name ${WEREAD_USER2}-read -v $HOME/weread-challenge/${WEREAD_USER2}/data:/app/data --network weread-challenge-net -e WEREAD_REMOTE_BROWSER=http://selenium-live:4444 -e WEREAD_DURATION=68 -e WEREAD_USER=${WEREAD_USER2} registry.techfetch.dev/jqknono/weread-challenge:latest") | crontab -
+(crontab -l 2>/dev/null; echo "00 */6 * * * docker run --rm --name ${WEREAD_USER1}-read -v $HOME/weread-challenge/${WEREAD_USER1}/data:/app/data --network weread-challenge-net -e WEREAD_REMOTE_BROWSER=http://selenium-live:4444 -e WEREAD_DURATION=68 -e WEREAD_USER=${WEREAD_USER1} registry.techfetch.dev/jqknono/weread-challenge:latest") | crontab -
+(crontab -l 2>/dev/null; echo "00 */6 * * * docker run --rm --name ${WEREAD_USER2}-read -v $HOME/weread-challenge/${WEREAD_USER2}/data:/app/data --network weread-challenge-net -e WEREAD_REMOTE_BROWSER=http://selenium-live:4444 -e WEREAD_DURATION=68 -e WEREAD_USER=${WEREAD_USER2} registry.techfetch.dev/jqknono/weread-challenge:latest") | crontab -
 ```
 
 ## 可配置项
@@ -424,7 +424,7 @@ docker buildx build --platform linux/amd64,linux/arm64 -t registry.techfetch.dev
 
 ## 参考
 
-- 脚本下载链接: [weread-challenge.js](https://storage1.techfetch.dev/weread-challenge/weread-challenge.js)
+- 脚本下载链接: [weread-challenge.js](https://raw.githubusercontent.com/jqknono/weread-challenge-selenium/refs/heads/main/src/weread-challenge.js)
 - 开源地址: [https://github.com/jqknono/weread-challenge-selenium](https://github.com/jqknono/weread-challenge-selenium)
 - 统计: [https://weread-challenge.techfetch.dev](https://weread-challenge.techfetch.dev)
 - 文章来源: [https://blog.techfetch.dev](https://blog.techfetch.dev/blog/2024/12/05/%E5%BE%AE%E4%BF%A1%E8%AF%BB%E4%B9%A6%E8%87%AA%E5%8A%A8%E6%89%93%E5%8D%A1%E5%88%B7%E6%97%B6%E9%95%BF/)
