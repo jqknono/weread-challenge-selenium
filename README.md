@@ -373,7 +373,7 @@ mkdir -p $HOME/weread-challenge/$WEREAD_USER2/data
 | `WEREAD_REMOTE_BROWSER` | ""               | -                              | 远程浏览器地址   |
 | `WEREAD_DURATION`       | `10`             | -                              | 阅读时长         |
 | `WEREAD_SPEED`          | `slow`           | `slow,normal,fast`             | 阅读速度         |
-| `WEREAD_SELECTION`      | `random`         | [0-4]                          | 选择阅读的书籍   |
+| `WEREAD_SELECTION`      | `random`         | -1,[0-4]                       | 选择阅读的书籍, -1表示阅读"胆小如鼠"   |
 | `WEREAD_BROWSER`        | `chrome`         | `chrome,MicrosoftEdge,firefox` | 浏览器           |
 | `ENABLE_EMAIL`          | `false`          | `true,false`                   | 邮件通知         |
 | `EMAIL_SMTP`            | ""               | -                              | 邮箱 SMTP 服务器 |
