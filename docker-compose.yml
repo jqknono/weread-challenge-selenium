@@ -10,7 +10,9 @@ services:
     depends_on:
       selenium:
         condition: service_healthy
-
+    dns:
+      - 119.29.29.29
+      - 223.5.5.5
   selenium:
     image: selenium/standalone-chrome:4.26
     pull_policy: if_not_present
