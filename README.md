@@ -85,7 +85,7 @@ cd $HOME/Documents/weread-challenge
 npm install selenium-webdriver
 
 # 下载脚本
-wget https://raw.githubusercontent.com/jqknono/weread-challenge-selenium/refs/heads/main/src/weread-challenge.js -O weread-challenge.js
+wget https://raw.githubusercontent.com/jqknono/weread-challenge-refs/heads/main/src/weread-challenge.js -O weread-challenge.js
 
 # 设置环境变量并运行
 export WEREAD_BROWSER="chrome"
@@ -125,7 +125,7 @@ services:
         condition: service_healthy
 
   selenium:
-    image: selenium/standalone-chrome:4.26
+    image: selenium/standalone-chromium:latest
     pull_policy: if_not_present
     shm_size: 2gb
     volumes:
@@ -169,7 +169,7 @@ docker run --restart always -d --name selenium-live \
   -e SE_NODE_MAX_INSTANCES=10 \
   -e SE_NODE_MAX_SESSIONS=10 \
   -e SE_NODE_OVERRIDE_MAX_SESSIONS=true \
-  selenium/standalone-chrome:4.26
+  selenium/standalone-chromium:latest
 
 # 运行微信读书挑战
 docker run --rm --name user-read \
@@ -216,7 +216,7 @@ services:
         condition: service_healthy
 
   selenium:
-    image: selenium/standalone-chrome:4.26
+    image: selenium/standalone-chromium:latest
     pull_policy: if_not_present
     shm_size: 2gb
     volumes:
@@ -258,7 +258,7 @@ docker run --restart always -d --name selenium-live \
   -e SE_NODE_OVERRIDE_MAX_SESSIONS=true \
   -e SE_SESSION_REQUEST_TIMEOUT=10 \
   -e SE_SESSION_RETRY_INTERVAL=3 \
-  selenium/standalone-chrome:4.26
+  selenium/standalone-chromium:latest
 
 WEREAD_USER="user"
 mkdir -p $HOME/weread-challenge/$WEREAD_USER/data
@@ -347,7 +347,7 @@ docker run --restart always -d --name selenium-live \
   -e SE_NODE_MAX_INSTANCES=10 \
   -e SE_NODE_MAX_SESSIONS=10 \
   -e SE_NODE_OVERRIDE_MAX_SESSIONS=true \
-  selenium/standalone-chrome:4.26
+  selenium/standalone-chromium:latest
 
 # 设置用户名
 WEREAD_USER1="user1"
