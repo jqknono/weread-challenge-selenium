@@ -85,7 +85,7 @@ cd $HOME/Documents/weread-challenge
 npm install selenium-webdriver
 
 # 下载脚本
-wget https://raw.githubusercontent.com/jqknono/weread-challenge-refs/heads/main/src/weread-challenge.js -O weread-challenge.js
+wget https://raw.githubusercontent.com/jqknono/weread-challenge-selenium/refs/heads/main/src/weread-challenge.js -O weread-challenge.js
 
 # 设置环境变量并运行
 export WEREAD_BROWSER="chrome"
