@@ -16,10 +16,10 @@ const http = require("http");
 const { execSync, spawnSync } = require("child_process");
 const os = require("os");
 
-const WEREAD_VERSION = "0.11.0";
+const WEREAD_VERSION = "0.12.0";
 const COOKIE_FILE = "./data/cookies.json"; // Path to save/load cookies
 const LOGIN_QR_CODE = "./data/login.png"; // Path to save login QR code
-const URL = "https://weread.qq.com/"; // Replace with the target URL
+const WEREAD_URL = "https://weread.qq.com/"; // Replace with the target URL
 const DEBUG = process.env.DEBUG === "true" || false; // Enable debug mode
 const WEREAD_USER = process.env.WEREAD_USER || "weread-default"; // User to use
 const WEREAD_REMOTE_BROWSER = process.env.WEREAD_REMOTE_BROWSER;
@@ -28,7 +28,10 @@ const WEREAD_SPEED = process.env.WEREAD_SPEED || "slow"; // Reading speed, slow 
 const WEREAD_SELECTION = process.env.WEREAD_SELECTION || 2; // Selection method
 const WEREAD_BROWSER = process.env.WEREAD_BROWSER || Browser.CHROME; // Browser to use, chrome | MicrosoftEdge | firefox
 const ENABLE_EMAIL = process.env.ENABLE_EMAIL === "true" || false; // Enable email notifications
-const WEREAD_AGREE_TERMS = process.env.WEREAD_AGREE_TERMS === "true" || true; // Agree to terms
+const WEREAD_AGREE_TERMS =
+  process.env.WEREAD_AGREE_TERMS === undefined
+    ? true
+    : process.env.WEREAD_AGREE_TERMS === "true"; // Agree to terms
 const EMAIL_PORT = parseInt(process.env.EMAIL_PORT) || 465; // SMTP port number, default 465
 const BARK_KEY = process.env.BARK_KEY || ""; // Bark推送密钥
 const BARK_SERVER = process.env.BARK_SERVER || "https://api.day.app"; // Bark服务器地址
@@ -54,15 +57,21 @@ if (!fs.existsSync("./data")) {
 // override existing log file
 const logStream = fs.createWriteStream("./data/output.log", { flags: "w" });
 
+function formatLocalTimestamp(d = new Date()) {
+  const pad2 = (n) => String(n).padStart(2, "0");
+  const pad3 = (n) => String(n).padStart(3, "0");
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(
+    d.getDate()
+  )} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(
+    d.getSeconds()
+  )}.${pad3(d.getMilliseconds())}`;
+}
+
 // Utility function to redirect logging
 function redirectConsole(method) {
   const originalMethod = console[method];
   console[method] = function (...args) {
-    let logstr =
-      `[${method.toUpperCase()}][${new Date()
-        .toISOString()
-        .replace("T", " ")
-        .replace("Z", "")}]: ` + args.join(" ");
+    let logstr = `[${method.toUpperCase()}][${formatLocalTimestamp()}]: ` + args.join(" ");
 
     // Write to the log file
     logStream.write(logstr + "\r\n");
@@ -830,18 +839,18 @@ async function main() {
       .window()
       .setRect({ width: randomWidth, height: randomHeight });
 
-    await driver.get(URL);
+    await driver.get(WEREAD_URL);
 
     if (fs.existsSync(COOKIE_FILE)) {
       await loadCookies(driver, COOKIE_FILE);
       await driver.navigate().refresh(); // Refresh to apply cookies
     }
 
-    console.info("Going to the URL:", URL);
+    console.info("Going to the URL:", WEREAD_URL);
 
     let title = await driver.getTitle();
     assert.equal("微信读书", title);
-    console.info("Successfully opened the url:", URL);
+    console.info("Successfully opened the url:", WEREAD_URL);
 
     // create dir data if not exists
     if (!fs.existsSync("./data")) {
