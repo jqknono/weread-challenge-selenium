@@ -59,7 +59,7 @@ docker compose up -d
 - 支持定时任务
 - 支持设置阅读时间
 - 支持邮件通知
-- 支持Bark推送通知
+- 支持 Bark 推送通知
 - 多平台支持: `linux | windows | macos`
 - 支持架构: `amd64`
 <!-- - 多架构支持: `amd64 | arm64` -->
@@ -97,16 +97,6 @@ node weread-challenge.js
 ```bash
 npm install nodemailer
 ```
-
-如需Bark推送功能，需要先下载并安装Bark App，然后获取推送密钥：
-
-1. 下载Bark App: https://github.com/finb/bark/releases
-2. 安装并打开Bark App
-3. 在Bark App中获取推送密钥（通常是设备码）
-4. 设置环境变量 `BARK_KEY` 为获取的密钥
-5. 可选：设置 `BARK_SERVER` 为自定义Bark服务器地址（默认使用官方服务器）
-
-**简化配置**：只需设置 `BARK_KEY` 即可启用Bark推送，无需额外启用开关。
 
 ### Docker Compose 运行
 
@@ -274,7 +264,6 @@ crontab 示例：
 
 00 01 * * * docker run --rm --name user2-read -v /home/test/weread-challenge/user2/data:/app/data --network weread-challenge-net -e WEREAD_REMOTE_BROWSER=http://selenium-live:4444 -e WEREAD_DURATION=180 -e WEREAD_USER=user2 -e WEREAD_SELECTION=2 -e ENABLE_EMAIL=true -e EMAIL_SMTP=smtp.mail.me.com -e EMAIL_USER=user2@icloud.com -e EMAIL_PASS=aaaa-bbbb-cccc-dddd -e EMAIL_PORT=587 -e EMAIL_TO=weread-challege@outlook.com docker.io/jqknono/weread-challenge:latest
 
-# Bark推送示例（替换或添加Bark相关环境变量）
 00 01 * * * docker run --rm --name user1-read -v /home/test/weread-challenge/user1/data:/app/data --network weread-challenge-net -e WEREAD_REMOTE_BROWSER=http://selenium-live:4444 -e WEREAD_DURATION=180 -e WEREAD_USER=user1 -e WEREAD_SELECTION=2 -e BARK_KEY=your-bark-key-here docker.io/jqknono/weread-challenge:latest
 ```
 
@@ -327,6 +316,52 @@ node weread-challenge.js
 
 Docker 运行同 Linux.
 
+## Bark推送
+
+Bark 是一个 iOS 设备上的推送服务，可以通过简单的 HTTP 请求向 iPhone 发送通知。本工具支持通过 Bark 推送运行状态和结果。
+
+### 配置 Bark
+
+1. 在 iPhone 上下载并安装 Bark App
+2. 打开 Bark App，获取推送密钥（通常是设备码）
+3. 设置环境变量 `BARK_KEY` 为获取的密钥
+4. 可选：设置 `BARK_SERVER` 为自定义 Bark 服务器地址（默认使用官方服务器 `https://api.day.app`）
+
+**简化配置**：只需设置 `BARK_KEY` 即可启用 Bark 推送，无需额外启用开关。
+
+### 使用示例
+
+#### 直接运行（Linux/MacOS/Windows）
+
+```bash
+export BARK_KEY="your-bark-key-here"
+node weread-challenge.js
+```
+
+#### Docker 运行
+
+```bash
+docker run --rm --name user-read \
+  -v $HOME/weread-challenge/user/data:/app/data \
+  -e WEREAD_REMOTE_BROWSER=http://selenium-live:4444 \
+  -e WEREAD_DURATION=180 \
+  -e BARK_KEY="your-bark-key-here" \
+  docker.io/jqknono/weread-challenge:latest
+```
+
+#### Crontab 定时任务示例
+
+```bash
+# Bark推送示例
+00 01 * * * docker run --rm --name user1-read -v /home/test/weread-challenge/user1/data:/app/data --network weread-challenge-net -e WEREAD_REMOTE_BROWSER=http://selenium-live:4444 -e WEREAD_DURATION=180 -e WEREAD_USER=user1 -e WEREAD_SELECTION=2 -e BARK_KEY=your-bark-key-here docker.io/jqknono/weread-challenge:latest
+```
+
+### 注意事项
+
+- Bark 推送依赖 iOS 设备上的 Bark App，请确保设备已安装并配置正确
+- 只需设置 `BARK_KEY` 即可启用 Bark 推送，无需额外开关
+- 支持自定义 Bark 服务器，通过设置 `BARK_SERVER` 环境变量
+
 ## 多用户支持
 
 ```bash
@@ -367,24 +402,25 @@ mkdir -p $HOME/weread-challenge/$WEREAD_USER2/data
 
 ## 可配置项
 
-| 环境变量                | 默认值           | 可选值                         | 说明             |
-| ----------------------- | ---------------- | ------------------------------ | ---------------- |
-| `WEREAD_USER`           | `weread-default` | -                              | 用户标识         |
-| `WEREAD_REMOTE_BROWSER` | ""               | -                              | 远程浏览器地址   |
-| `WEREAD_DURATION`       | `10`             | -                              | 阅读时长         |
-| `WEREAD_SPEED`          | `slow`           | `slow,normal,fast`             | 阅读速度         |
-| `WEREAD_SELECTION`      | `2`              | -1,[0-4]                       | 选择阅读的书籍, -1表示阅读"胆小如鼠"   |
-| `WEREAD_BROWSER`        | `chrome`         | `chrome,MicrosoftEdge,firefox` | 浏览器           |
-| `ENABLE_EMAIL`          | `false`          | `true,false`                   | 邮件通知         |
-| `EMAIL_SMTP`            | ""               | -                              | 邮箱 SMTP 服务器 |
-| `EMAIL_PORT`            | `465`            | `25,465,587`                   | 邮箱 SMTP 端口   |
-| `EMAIL_USER`            | ""               | -                              | 邮箱用户名       |
-| `EMAIL_PASS`            | ""               | -                              | 邮箱密码         |
-| `EMAIL_FROM`            | ""               | -                              | 发件人           |
-| `EMAIL_TO`              | ""               | -                              | 收件人           |
-| `BARK_KEY`              | ""               | -                              | Bark推送密钥     |
-| `BARK_SERVER`           | `https://api.day.app` | -                          | Bark服务器地址   |
-| `WEREAD_AGREE_TERMS`    | `true`           | `true,false`                   | 隐私同意条款     |
+| 环境变量                | 默认值                | 可选值                         | 说明                                  |
+| ----------------------- | --------------------- | ------------------------------ | ------------------------------------- |
+| `WEREAD_USER`           | `weread-default`      | -                              | 用户标识                              |
+| `WEREAD_REMOTE_BROWSER` | ""                    | -                              | 远程浏览器地址                        |
+| `WEREAD_DURATION`       | `10`                  | -                              | 阅读时长                              |
+| `WEREAD_SPEED`          | `slow`                | `slow,normal,fast`             | 阅读速度                              |
+| `WEREAD_SCREENSHOT`     | `true`                | `true,false`                   | 阅读期间每分钟截图                    |
+| `WEREAD_SELECTION`      | `2`                   | -1,[0-4]                       | 选择阅读的书籍, -1 表示阅读"胆小如鼠" |
+| `WEREAD_BROWSER`        | `chrome`              | `chrome,MicrosoftEdge,firefox` | 浏览器                                |
+| `ENABLE_EMAIL`          | `false`               | `true,false`                   | 邮件通知                              |
+| `EMAIL_SMTP`            | ""                    | -                              | 邮箱 SMTP 服务器                      |
+| `EMAIL_PORT`            | `465`                 | `25,465,587`                   | 邮箱 SMTP 端口                        |
+| `EMAIL_USER`            | ""                    | -                              | 邮箱用户名                            |
+| `EMAIL_PASS`            | ""                    | -                              | 邮箱密码                              |
+| `EMAIL_FROM`            | ""                    | -                              | 发件人                                |
+| `EMAIL_TO`              | ""                    | -                              | 收件人                                |
+| `BARK_KEY`              | ""                    | -                              | Bark 推送密钥                         |
+| `BARK_SERVER`           | `https://api.day.app` | -                              | Bark 服务器地址                       |
+| `WEREAD_AGREE_TERMS`    | `true`                | `true,false`                   | 隐私同意条款                          |
 
 <!-- ## 容器多架构支持
 
@@ -407,7 +443,6 @@ docker buildx build --platform linux/amd64,linux/arm64 -t docker.io/jqknono/were
 - **统计误差**：微信读书统计可能会漏数分钟，期望每日获得 65 分钟，建议调整阅读时长到 68 分钟
 - **登录有效期**：网页扫码登录 cookies 有效期为 30 天，实测登录一次可以长期有效
 - **邮件通知**：邮件通知可能被识别为垃圾邮件，建议在收件方添加白名单
-- **Bark推送**：Bark推送依赖iOS设备上的Bark App，只需设置BARK_KEY即可启用，无需额外开关，支持自定义Bark服务器
 - **使用声明**：本项目仅供学习交流使用，请勿用于商业用途，请勿用于违法用途
 - **侵权处理**：如存在可能的侵权，请联系 `weread-challenge@techfetch.dev`，本项目会立即删除
 

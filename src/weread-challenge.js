@@ -16,7 +16,7 @@ const http = require("http");
 const { execSync, spawnSync } = require("child_process");
 const os = require("os");
 
-const WEREAD_VERSION = "0.12.0";
+const WEREAD_VERSION = "0.13.0";
 const COOKIE_FILE = "./data/cookies.json"; // Path to save/load cookies
 const LOGIN_QR_CODE = "./data/login.png"; // Path to save login QR code
 const WEREAD_URL = "https://weread.qq.com/"; // Replace with the target URL
@@ -28,6 +28,10 @@ const WEREAD_SPEED = process.env.WEREAD_SPEED || "slow"; // Reading speed, slow 
 const WEREAD_SELECTION = process.env.WEREAD_SELECTION || 2; // Selection method
 const WEREAD_BROWSER = process.env.WEREAD_BROWSER || Browser.CHROME; // Browser to use, chrome | MicrosoftEdge | firefox
 const ENABLE_EMAIL = process.env.ENABLE_EMAIL === "true" || false; // Enable email notifications
+const WEREAD_SCREENSHOT =
+  process.env.WEREAD_SCREENSHOT === undefined
+    ? true
+    : process.env.WEREAD_SCREENSHOT === "true"; // Reading期间是否每分钟截图
 const WEREAD_AGREE_TERMS =
   process.env.WEREAD_AGREE_TERMS === undefined
     ? true
@@ -41,6 +45,7 @@ const QR_EXPIRED_TEXTS = ["点击刷新二维码", "二维码已失效"]; // 登
 // WEREAD_DURATION
 // WEREAD_BROWSER
 // ENABLE_EMAIL
+// WEREAD_SCREENSHOT
 // EMAIL_SMTP
 // EMAIL_USER
 // EMAIL_PASS
@@ -1070,6 +1075,10 @@ async function main() {
 
     // duration from environment variable, WEREAD_DURATION in minutes
     console.info("Reading duration: ", WEREAD_DURATION, " minutes");
+    console.info(
+      "阅读期间截图: ",
+      WEREAD_SCREENSHOT ? "开启" : "关闭"
+    );
     let startTime = new Date();
     console.info("Start time: ", startTime);
     let endTime = new Date(startTime.getTime() + WEREAD_DURATION * 60000);
@@ -1089,22 +1098,24 @@ async function main() {
       if (currentTime.getMinutes() !== screenshotTime.getMinutes()) {
         // take screenshot every minute, and get round index
         let screenshotIndex = Math.round((currentTime - startTime) / 60000);
-        await driver.takeScreenshot().then((image, err) => {
-          fs.writeFileSync(
-            `./data/screenshot-${screenshotIndex}.png`,
-            image,
-            "base64"
-          );
-        });
+        const screenshotPath = `./data/screenshot-${screenshotIndex}.png`;
+        if (WEREAD_SCREENSHOT) {
+          await driver.takeScreenshot().then((image, err) => {
+            fs.writeFileSync(screenshotPath, image, "base64");
+          });
+        }
         screenshotTime = currentTime;
         console.info("Reading minute: ", screenshotIndex);
 
         // if the screenshot png size is less than 100 KB, then refresh the page
         // continue if file not found
-        if (!fs.existsSync(`./data/screenshot-${screenshotIndex}.png`)) {
+        if (!WEREAD_SCREENSHOT) {
           continue;
         }
-        let stats = fs.statSync(`./data/screenshot-${screenshotIndex}.png`);
+        if (!fs.existsSync(screenshotPath)) {
+          continue;
+        }
+        let stats = fs.statSync(screenshotPath);
         let fileSizeInBytes = stats.size;
         let fileSizeInKB = fileSizeInBytes / 1024;
         console.debug("Screenshot size: ", fileSizeInKB, " KB");
