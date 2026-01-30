@@ -113,6 +113,8 @@ services:
     depends_on:
       selenium:
         condition: service_healthy
+    dns:
+      - 223.5.5.5
 
   selenium:
     image: selenium/standalone-chromium:latest
@@ -124,8 +126,10 @@ services:
       - SE_ENABLE_TRACING=false
       - SE_BIND_HOST=false
       - SE_JAVA_DISABLE_HOSTNAME_VERIFICATION=false
+    dns:
+      - 223.5.5.5
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4444/wd/hub/status"]
+      test: ["CMD", "curl", "-f", "http://localhost:4444/status"]
       interval: 5s
       timeout: 60s
       retries: 10
@@ -151,6 +155,8 @@ docker run --restart always -d --name selenium-live \
   --shm-size="2g" \
   --network weread-challenge-net \
   --hostname selenium-live \
+  --dns 119.29.29.29 \
+  --dns 223.5.5.5 \
   -p 4444:4444 \
   -p 7900:7900 \
   -e SE_ENABLE_TRACING=false \
