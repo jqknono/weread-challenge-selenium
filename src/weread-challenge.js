@@ -16,7 +16,26 @@ const https = require("https");
 const http = require("http");
 const { execSync, spawnSync } = require("child_process");
 const os = require("os");
-const { version: WEREAD_VERSION } = require("../package.json");
+
+function getWereadVersion() {
+  const packageJsonPaths = [
+    path.resolve(__dirname, "../package.json"),
+    path.resolve(__dirname, "./package.json"),
+  ];
+
+  for (const packageJsonPath of packageJsonPaths) {
+    try {
+      const pkg = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
+      if (pkg && typeof pkg.version === "string" && pkg.version.trim() !== "") {
+        return pkg.version.trim();
+      }
+    } catch (_) {}
+  }
+
+  return process.env.WEREAD_VERSION || "0.0.0";
+}
+
+const WEREAD_VERSION = getWereadVersion();
 const COOKIE_FILE = "./data/cookies.json"; // Path to save/load cookies
 const LOGIN_QR_CODE = "./data/login.png"; // Path to save login QR code
 const WEREAD_URL = "https://weread.qq.com/"; // Replace with the target URL
