@@ -21,9 +21,24 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Extract tag name
-        id: tag
-        run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+      - name: Validate package version with tag
+        id: version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          EXPECTED_TAG="v${PKG_VERSION}"
+
+          if [ -z "${PKG_VERSION}" ] || [ "${PKG_VERSION}" = "undefined" ]; then
+            echo "package.json version is missing"
+            exit 1
+          fi
+
+          if [ "${TAG}" != "${EXPECTED_TAG}" ]; then
+            echo "Tag ${TAG} does not match package.json version ${EXPECTED_TAG}"
+            exit 1
+          fi
+
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
@@ -33,6 +48,5 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/weread-challenge:${{ steps.tag.outputs.tag }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/weread-challenge:${{ steps.version.outputs.tag }}
             ${{ secrets.DOCKERHUB_USERNAME }}/weread-challenge:latest
-

@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * @license
  * Copyright (c) 2024 weread-challenge@techfetch.dev
@@ -15,8 +16,7 @@ const https = require("https");
 const http = require("http");
 const { execSync, spawnSync } = require("child_process");
 const os = require("os");
-
-const WEREAD_VERSION = "0.13.0";
+const { version: WEREAD_VERSION } = require("../package.json");
 const COOKIE_FILE = "./data/cookies.json"; // Path to save/load cookies
 const LOGIN_QR_CODE = "./data/login.png"; // Path to save login QR code
 const WEREAD_URL = "https://weread.qq.com/"; // Replace with the target URL
@@ -444,6 +444,35 @@ async function findQRCodeElement(driver) {
   }
 }
 
+// 从页面二维码图片中解码登录链接并在终端显示为二维码
+async function extractAndDisplayQRCode(driver) {
+  try {
+    const qrImg = await driver.findElement(
+      By.xpath("//img[contains(@class, 'qr') or contains(@src, 'qr') or contains(@alt, '二维码')]")
+    );
+
+    const base64Png = await qrImg.takeScreenshot();
+
+    const { PNG } = require('pngjs');
+    const png = PNG.sync.read(Buffer.from(base64Png, 'base64'));
+
+    const jsQR = require('jsqr');
+    const code = jsQR(new Uint8ClampedArray(png.data), png.width, png.height);
+
+    if (code && code.data) {
+      console.info("登录链接:", code.data);
+      const qrcode = require('qrcode-terminal');
+      qrcode.generate(code.data, { small: true });
+      return code.data;
+    }
+    console.warn("无法从二维码图片中解析登录链接");
+    return null;
+  } catch (e) {
+    console.warn("提取二维码登录链接失败:", e.message);
+    return null;
+  }
+}
+
 // 安全点击元素函数，处理元素被拦截的情况
 async function safeClickElement(driver, element, description = "元素") {
   try {
@@ -558,6 +587,7 @@ async function refreshQRCode(driver) {
         fs.writeFileSync(LOGIN_QR_CODE, image, "base64");
       });
       console.info("QR code refreshed, datetime: ", new Date());
+      await extractAndDisplayQRCode(driver);
       return true;
     } else {
       console.error("刷新后未能找到任何二维码相关元素");
@@ -889,7 +919,8 @@ async function main() {
           fs.writeFileSync(LOGIN_QR_CODE, image, "base64");
         });
         console.info("QR code saved, datetime: ", new Date());
-        
+        await extractAndDisplayQRCode(driver);
+
       } else {
         console.error("未能找到任何二维码相关元素");
       }
@@ -950,6 +981,7 @@ async function main() {
               fs.writeFileSync(LOGIN_QR_CODE, image, "base64");
             });
             console.info("页面刷新后找到二维码, datetime: ", new Date());
+            await extractAndDisplayQRCode(driver);
           }
         }
         continue;
