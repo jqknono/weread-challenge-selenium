@@ -47,7 +47,9 @@ docker compose up -d
 - 支持保存 cookies
 - 支持加载 cookies
 - 支持选择最近阅读的第 X 本书开始阅读
-- 默认随机选择一本书开始阅读
+- 默认选择书架第 2 本书开始阅读
+- 支持随机选择书籍开始阅读
+- 支持自定义默认兜底阅读链接
 - 支持自动阅读
 - 支持跳到下一章
 - 支持读完跳回第一章继续阅读
@@ -93,6 +95,23 @@ weread-challenge
 
 ```bash
 npx weread-selenium-cli
+```
+
+如果你直接运行当前仓库源码，可使用：
+
+```bash
+# 安装依赖
+npm install
+
+# 本地浏览器运行
+npm run dev
+
+# 本地浏览器 + DEBUG 日志
+npm run debug
+
+# 使用 package.json 内置示例参数运行
+# 注意：npm run start 中的 WEREAD_REMOTE_BROWSER 是示例地址，需按实际环境调整
+npm run start
 ```
 
 ### Docker Compose 运行
@@ -399,25 +418,26 @@ mkdir -p $HOME/weread-challenge/$WEREAD_USER2/data
 
 ## 可配置项
 
-| 环境变量                | 默认值                | 可选值                         | 说明                                  |
-| ----------------------- | --------------------- | ------------------------------ | ------------------------------------- |
-| `WEREAD_USER`           | `weread-default`      | -                              | 用户标识                              |
-| `WEREAD_REMOTE_BROWSER` | ""                    | -                              | 远程浏览器地址                        |
-| `WEREAD_DURATION`       | `10`                  | -                              | 阅读时长                              |
-| `WEREAD_SPEED`          | `slow`                | `slow,normal,fast`             | 阅读速度                              |
-| `WEREAD_SCREENSHOT`     | `true`                | `true,false`                   | 阅读期间每分钟截图                    |
-| `WEREAD_SELECTION`      | `2`                   | -1,[0-4]                       | 选择阅读的书籍, -1 表示阅读"胆小如鼠" |
-| `WEREAD_BROWSER`        | `chrome`              | `chrome,MicrosoftEdge,firefox` | 浏览器                                |
-| `ENABLE_EMAIL`          | `false`               | `true,false`                   | 邮件通知                              |
-| `EMAIL_SMTP`            | ""                    | -                              | 邮箱 SMTP 服务器                      |
-| `EMAIL_PORT`            | `465`                 | `25,465,587`                   | 邮箱 SMTP 端口                        |
-| `EMAIL_USER`            | ""                    | -                              | 邮箱用户名                            |
-| `EMAIL_PASS`            | ""                    | -                              | 邮箱密码                              |
-| `EMAIL_FROM`            | ""                    | -                              | 发件人                                |
-| `EMAIL_TO`              | ""                    | -                              | 收件人                                |
-| `BARK_KEY`              | ""                    | -                              | Bark 推送密钥                         |
-| `BARK_SERVER`           | `https://api.day.app` | -                              | Bark 服务器地址                       |
-| `WEREAD_AGREE_TERMS`    | `true`                | `true,false`                   | 隐私同意条款                          |
+| 环境变量                | 默认值                                                    | 可选值                                | 说明                                                                                            |
+| ----------------------- | --------------------------------------------------------- | ------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `WEREAD_USER`           | `weread-default`                                          | -                                     | 用户标识                                                                                        |
+| `WEREAD_REMOTE_BROWSER` | ""                                                        | -                                     | 远程浏览器地址                                                                                  |
+| `WEREAD_DURATION`       | `10`                                                      | -                                     | 阅读时长                                                                                        |
+| `WEREAD_SPEED`          | `slow`                                                    | `slow,normal,fast`                    | 阅读速度                                                                                        |
+| `WEREAD_SCREENSHOT`     | `true`                                                    | `true,false`                          | 阅读期间每分钟截图                                                                              |
+| `WEREAD_SELECTION`      | `2`                                                       | `-1,0,1,2,3,4`                        | 选书方式，`-1` 直接读取 `DEFAULT_BOOK_URL`，`0` 随机选择第 1 到 4 本，`1-4` 表示书架中的第 N 本 |
+| `DEFAULT_BOOK_URL`      | https://weread.qq.com/web/reader/276323e0813ab90a5g0144d7 | -                                     | 默认阅读链接，`WEREAD_SELECTION=-1` 或书架中未找到可点击书籍时会直接使用                        |
+| `WEREAD_BROWSER`        | `chrome`                                                  | `chrome,MicrosoftEdge,firefox,safari` | 浏览器                                                                                          |
+| `ENABLE_EMAIL`          | `false`                                                   | `true,false`                          | 邮件通知                                                                                        |
+| `EMAIL_SMTP`            | ""                                                        | -                                     | 邮箱 SMTP 服务器                                                                                |
+| `EMAIL_PORT`            | `465`                                                     | `25,465,587`                          | 邮箱 SMTP 端口                                                                                  |
+| `EMAIL_USER`            | ""                                                        | -                                     | 邮箱用户名                                                                                      |
+| `EMAIL_PASS`            | ""                                                        | -                                     | 邮箱密码                                                                                        |
+| `EMAIL_FROM`            | ""                                                        | -                                     | 发件人                                                                                          |
+| `EMAIL_TO`              | ""                                                        | -                                     | 收件人                                                                                          |
+| `BARK_KEY`              | ""                                                        | -                                     | Bark 推送密钥                                                                                   |
+| `BARK_SERVER`           | `https://api.day.app`                                     | -                                     | Bark 服务器地址                                                                                 |
+| `WEREAD_AGREE_TERMS`    | `true`                                                    | `true,false`                          | 隐私同意条款                                                                                    |
 
 <!-- ## 容器多架构支持
 

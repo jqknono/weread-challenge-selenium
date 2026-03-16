@@ -1,6 +1,6 @@
 {
   "name": "weread-selenium-cli",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "description": "Selenium automation tool for WeRead challenge",
   "main": "src/weread-challenge.js",
   "bin": {

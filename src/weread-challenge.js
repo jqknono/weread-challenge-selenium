@@ -58,6 +58,9 @@ const WEREAD_AGREE_TERMS =
 const EMAIL_PORT = parseInt(process.env.EMAIL_PORT) || 465; // SMTP port number, default 465
 const BARK_KEY = process.env.BARK_KEY || ""; // Bark推送密钥
 const BARK_SERVER = process.env.BARK_SERVER || "https://api.day.app"; // Bark服务器地址
+const DEFAULT_BOOK_URL =
+  process.env.DEFAULT_BOOK_URL ||
+  "https://weread.qq.com/web/reader/276323e0813ab90a5g0144d7"; // 默认阅读链接
 const QR_EXPIRED_TEXTS = ["点击刷新二维码", "二维码已失效"]; // 登录二维码过期提示
 // env vars:
 // WEREAD_REMOTE_BROWSER
@@ -72,6 +75,7 @@ const QR_EXPIRED_TEXTS = ["点击刷新二维码", "二维码已失效"]; // 登
 // EMAIL_TO
 // BARK_KEY
 // BARK_SERVER
+// DEFAULT_BOOK_URL
 
 // create /data directory if not exists
 if (!fs.existsSync("./data")) {
@@ -1031,27 +1035,9 @@ async function main() {
 
     // Find the first div with class "wr_index_mini_shelf_card"
     let selection = Number(WEREAD_SELECTION);
-    const DEFAULT_MOUSE_BOOK_URL = "https://weread.qq.com/web/reader/276323e0813ab90a5g0144d7";
-
     if (selection === -1) {
-      console.info("WEREAD_SELECTION=-1，尝试打开《胆小如鼠》。");
-      const targetBookCards = await driver.findElements(
-        By.xpath("//div[@class='wr_index_mini_shelf_card' and .//div[contains(text(), '胆小如鼠')]]"),
-        5000
-      );
-
-      if (targetBookCards.length > 0) {
-        const clickResult = await safeClickElement(driver, targetBookCards[0], "《胆小如鼠》书籍卡片");
-        if (!clickResult) {
-          console.warn("点击《胆小如鼠》卡片失败，改为直接跳转链接。");
-          await driver.get(DEFAULT_MOUSE_BOOK_URL);
-        }
-      } else {
-        console.warn("未在书架找到《胆小如鼠》，直接跳转阅读链接。");
-        await driver.get(DEFAULT_MOUSE_BOOK_URL);
-      }
-
-      await driver.wait(until.titleContains("胆小如鼠"), 10000);
+      console.info("WEREAD_SELECTION=-1，直接打开 DEFAULT_BOOK_URL:", DEFAULT_BOOK_URL);
+      await driver.get(DEFAULT_BOOK_URL);
     } else {
       if (selection === 0) {
         // random selection between 1 and 4
@@ -1070,8 +1056,7 @@ async function main() {
         console.info("Clicked on the ", selection, "th book.");
       } else {
         console.warn("No book link found. Using the default link.");
-        await driver.get(DEFAULT_MOUSE_BOOK_URL);
-        await driver.wait(until.titleContains("胆小如鼠"), 10000);
+        await driver.get(DEFAULT_BOOK_URL);
       }
     }
 
