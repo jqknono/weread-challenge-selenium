@@ -522,6 +522,8 @@ function canSendLoginLinkEmail() {
 
 function buildLoginLinkEmailHtml(loginUrl) {
   const safeUrl = escapeHtml(loginUrl);
+  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=360x360&data=${encodeURIComponent(loginUrl)}`;
+  const safeQrImageUrl = escapeHtml(qrImageUrl);
   return `
   <!DOCTYPE html>
   <html>
@@ -530,15 +532,18 @@ function buildLoginLinkEmailHtml(loginUrl) {
       <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
           .card { max-width: 680px; margin: 0 auto; padding: 20px; }
-          .link-box { background: #f9f9f9; border-left: 4px solid #2d8cf0; padding: 12px; word-break: break-all; }
+          .qr-box { background: #f9f9f9; border-left: 4px solid #2d8cf0; padding: 16px; text-align: center; }
+          .qr-img { width: 280px; height: 280px; display: block; margin: 8px auto 12px auto; }
+          .open-link { display: inline-block; background: #2d8cf0; color: #fff !important; text-decoration: none; padding: 8px 14px; border-radius: 6px; }
       </style>
   </head>
   <body>
       <div class="card">
-          <h2 style="color: #2c3e50;">微信读书登录链接</h2>
+          <h2 style="color: #2c3e50;">微信读书登录二维码</h2>
           <p>检测到新的扫码登录链接，请尽快在手机端完成登录。</p>
-          <div class="link-box">
-            <a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${safeUrl}</a>
+          <div class="qr-box">
+            <img class="qr-img" src="${safeQrImageUrl}" alt="微信读书登录二维码" />
+            <a class="open-link" href="${safeUrl}" target="_blank" rel="noopener noreferrer">点击打开登录链接</a>
           </div>
           <p style="font-size: 12px; color: #7f8c8d; margin-top: 16px;">
             该链接由 weread-challenge 自动发送。
@@ -579,7 +584,7 @@ async function notifyLoginLink(loginUrl) {
     tasks.push(
       sendMail(
         "[项目进展--登录链接]",
-        `微信读书登录链接：${loginUrl}`,
+        "检测到新的微信读书登录二维码，请在邮件中扫码登录。",
         [],
         { html: buildLoginLinkEmailHtml(loginUrl) }
       )
