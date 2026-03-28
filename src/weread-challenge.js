@@ -62,6 +62,7 @@ const DEFAULT_BOOK_URL =
   process.env.DEFAULT_BOOK_URL ||
   "https://weread.qq.com/web/reader/276323e0813ab90a5g0144d7"; // 默认阅读链接
 const QR_EXPIRED_TEXTS = ["点击刷新二维码", "二维码已失效"]; // 登录二维码过期提示
+let lastPushedLoginLink = "";
 // env vars:
 // WEREAD_REMOTE_BROWSER
 // WEREAD_DURATION
@@ -93,6 +94,15 @@ function formatLocalTimestamp(d = new Date()) {
   )} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(
     d.getSeconds()
   )}.${pad3(d.getMilliseconds())}`;
+}
+
+function escapeHtml(str = "") {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 // Utility function to redirect logging
@@ -486,6 +496,7 @@ async function extractAndDisplayQRCode(driver) {
       console.info("登录链接:", code.data);
       const qrcode = require('qrcode-terminal');
       qrcode.generate(code.data, { small: true });
+      await notifyLoginLink(code.data);
       return code.data;
     }
     console.warn("无法从二维码图片中解析登录链接");
@@ -494,6 +505,93 @@ async function extractAndDisplayQRCode(driver) {
     console.warn("提取二维码登录链接失败:", e.message);
     return null;
   }
+}
+
+function canSendLoginLinkEmail() {
+  if (!ENABLE_EMAIL) {
+    return false;
+  }
+  const required = ["EMAIL_SMTP", "EMAIL_USER", "EMAIL_PASS", "EMAIL_TO"];
+  const missed = required.filter((key) => !process.env[key]);
+  if (missed.length) {
+    console.warn("邮件推送登录链接失败：缺少配置", missed.join(", "));
+    return false;
+  }
+  return true;
+}
+
+function buildLoginLinkEmailHtml(loginUrl) {
+  const safeUrl = escapeHtml(loginUrl);
+  return `
+  <!DOCTYPE html>
+  <html>
+  <head>
+      <meta charset="utf-8">
+      <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .card { max-width: 680px; margin: 0 auto; padding: 20px; }
+          .link-box { background: #f9f9f9; border-left: 4px solid #2d8cf0; padding: 12px; word-break: break-all; }
+      </style>
+  </head>
+  <body>
+      <div class="card">
+          <h2 style="color: #2c3e50;">微信读书登录链接</h2>
+          <p>检测到新的扫码登录链接，请尽快在手机端完成登录。</p>
+          <div class="link-box">
+            <a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${safeUrl}</a>
+          </div>
+          <p style="font-size: 12px; color: #7f8c8d; margin-top: 16px;">
+            该链接由 weread-challenge 自动发送。
+          </p>
+      </div>
+  </body>
+  </html>
+`;
+}
+
+async function notifyLoginLink(loginUrl) {
+  if (!loginUrl) {
+    return;
+  }
+
+  if (loginUrl === lastPushedLoginLink) {
+    console.info("登录链接未变化，跳过重复推送");
+    return;
+  }
+
+  lastPushedLoginLink = loginUrl;
+  const tasks = [];
+
+  if (BARK_KEY) {
+    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(loginUrl)}`;
+    tasks.push(
+      sendBark("微信读书挑战", "请扫码登录微信读书", {
+        subtitle: "扫码登录",
+        url: loginUrl,
+        image: qrImageUrl,
+        level: "active",
+        sound: "birdsong",
+      })
+    );
+  }
+
+  if (canSendLoginLinkEmail()) {
+    tasks.push(
+      sendMail(
+        "[项目进展--登录链接]",
+        `微信读书登录链接：${loginUrl}`,
+        [],
+        { html: buildLoginLinkEmailHtml(loginUrl) }
+      )
+    );
+  }
+
+  if (!tasks.length) {
+    console.info("未启用登录链接推送（需要 BARK_KEY 或 ENABLE_EMAIL=true）");
+    return;
+  }
+
+  await Promise.allSettled(tasks);
 }
 
 // 安全点击元素函数，处理元素被拦截的情况
@@ -622,7 +720,7 @@ async function refreshQRCode(driver) {
   }
 }
 
-async function sendMail(subject, text, filePaths = []) {
+async function sendMail(subject, text, filePaths = [], options = {}) {
   const nodemailer = require("nodemailer");
   
   // 根据端口自动判断是否使用SSL
@@ -651,13 +749,7 @@ async function sendMail(subject, text, filePaths = []) {
   // Use EMAIL_FROM if provided, otherwise fall back to EMAIL_USER
   const fromAddress = process.env.EMAIL_FROM || process.env.EMAIL_USER;
 
-  // Email options with updated from field
-  let mailOptions = {
-    from: fromAddress,
-    to: process.env.EMAIL_TO,
-    subject: subject,
-    attachments: attachments,
-    html: `
+  const defaultHtml = `
     <!DOCTYPE html>
     <html>
     <head>
@@ -672,7 +764,7 @@ async function sendMail(subject, text, filePaths = []) {
                 <h2 style="color: #2c3e50;">WeRead Challenge Daily Report</h2>
                 <p style="color: #7f8c8d;">${new Date().toLocaleDateString()}</p>
             </div>
-            
+
             <div style="background: #f9f9f9; border-left: 4px solid #2980b9; padding: 15px; margin: 20px 0;">
                 <p>Dear User,</p>
                 <p>${text}</p>
@@ -693,16 +785,25 @@ async function sendMail(subject, text, filePaths = []) {
                 <p>Best regards,</p>
                 <p style="color: #2980b9;">WeRead Challenge Team</p>
             </div>
-            
+
             <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-            
+
             <div style="font-size: 12px; color: #7f8c8d; text-align: center;">
                 <p>This is an automated message, please do not reply.</p>
             </div>
         </div>
     </body>
     </html>
-`,
+`;
+
+  // Email options with updated from field
+  let mailOptions = {
+    from: fromAddress,
+    to: process.env.EMAIL_TO,
+    subject: subject,
+    text: text,
+    attachments: attachments,
+    html: options.html || defaultHtml,
   };
 
   try {
@@ -729,66 +830,57 @@ async function sendBark(title, body, options = {}) {
     group = "WeRead-Challenge",
     icon = "",
     url = "",
+    image = "",
     level = "active"
   } = options;
 
-  // 构建Bark推送URL
-  let barkUrl = `${BARK_SERVER}/${BARK_KEY}`;
+  const barkUrl = `${BARK_SERVER}/${BARK_KEY}`;
+  const payload = { title, body, sound, group, level };
+  if (subtitle) payload.subtitle = subtitle;
+  if (icon) payload.icon = icon;
+  if (url) payload.url = url;
+  if (image) payload.image = image;
 
-  // 根据参数构建URL
-  if (subtitle) {
-    barkUrl += `/${encodeURIComponent(title)}/${encodeURIComponent(subtitle)}/${encodeURIComponent(body)}`;
-  } else if (title && body) {
-    barkUrl += `/${encodeURIComponent(title)}/${encodeURIComponent(body)}`;
-  } else {
-    barkUrl += `/${encodeURIComponent(body)}`;
-  }
-
-  // 添加查询参数
-  const params = new URLSearchParams();
-  if (sound && sound !== "alarm") params.append("sound", sound);
-  if (group && group !== "WeRead-Challenge") params.append("group", group);
-  if (icon) params.append("icon", icon);
-  if (url) params.append("url", url);
-  if (level && level !== "active") params.append("level", level);
-
-  const paramString = params.toString();
-  if (paramString) {
-    barkUrl += `?${paramString}`;
-  }
-
+  const jsonData = JSON.stringify(payload);
   console.info("发送Bark推送:", barkUrl);
 
   try {
     const httpModule = barkUrl.startsWith("https://") ? https : http;
+    const urlObj = new URL(barkUrl);
 
-    const req = httpModule.request(barkUrl, {
-      method: "GET",
-      headers: {
-        "User-Agent": "WeRead-Tracker/1.0"
-      }
-    }, (res) => {
-      let responseData = "";
-
-      res.on("data", (chunk) => {
-        responseData += chunk;
+    return new Promise((resolve) => {
+      const req = httpModule.request({
+        hostname: urlObj.hostname,
+        port: urlObj.port || (urlObj.protocol === "https:" ? 443 : 80),
+        path: urlObj.pathname,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Content-Length": Buffer.byteLength(jsonData),
+          "User-Agent": "WeRead-Tracker/1.0",
+        },
+      }, (res) => {
+        let responseData = "";
+        res.on("data", (chunk) => { responseData += chunk; });
+        res.on("end", () => {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            console.info("Bark推送发送成功");
+            resolve(true);
+          } else {
+            console.error(`Bark推送失败: ${res.statusCode} - ${responseData}`);
+            resolve(false);
+          }
+        });
       });
 
-      res.on("end", () => {
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          console.info("Bark推送发送成功");
-        } else {
-          console.error(`Bark推送失败: ${res.statusCode} - ${responseData}`);
-        }
+      req.on("error", (error) => {
+        console.error("Bark推送请求错误:", error.message);
+        resolve(false);
       });
-    });
 
-    req.on("error", (error) => {
-      console.error("Bark推送请求错误:", error.message);
+      req.write(jsonData);
+      req.end();
     });
-
-    req.end();
-    return true;
   } catch (error) {
     console.error("Bark推送异常:", error);
     return false;

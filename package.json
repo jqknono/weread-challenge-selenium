@@ -1,6 +1,6 @@
 {
   "name": "weread-selenium-cli",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "description": "Selenium automation tool for WeRead challenge",
   "main": "src/weread-challenge.js",
   "bin": {
@@ -16,7 +16,7 @@
     "start": "WEREAD_SELECTION=-1 WEREAD_REMOTE_BROWSER=http://172.23.0.2:4444 node src/weread-challenge.js",
     "dev": "WEREAD_REMOTE_BROWSER= node src/weread-challenge.js",
     "debug": "DEBUG=true WEREAD_REMOTE_BROWSER= node src/weread-challenge.js",
-    "publish:npm:check": "node -e \"const p=require('./package.json');const miss=['name','version'].filter(k=>!p[k]);if(miss.length){console.error('缺少字段: '+miss.join(','));process.exit(1);}if(!/^\\\\d+\\\\.\\\\d+\\\\.\\\\d+([-.].+)?$/.test(p.version)){console.error('version 不是有效 semver: '+p.version);process.exit(1);}console.log('发布校验通过: '+p.name+'@'+p.version);\"",
+    "publish:npm:check": "node -e \"const p=require('./package.json');const miss=['name','version'].filter(k=>!p[k]);if(miss.length){console.error('缺少字段: '+miss.join(','));process.exit(1);}if(!/^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$/.test(p.version)){console.error('version 不是有效 semver: '+p.version);process.exit(1);}console.log('发布校验通过: '+p.name+'@'+p.version);\"",
     "publish:npm:dry-run": "npm run publish:npm:check && npm publish --access public --dry-run",
     "publish:npm": "npm run publish:npm:check && npm publish --access public"
   },

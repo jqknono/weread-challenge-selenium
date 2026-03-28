@@ -377,6 +377,39 @@ docker run --rm --name user-read \
 - Bark 推送依赖 iOS 设备上的 Bark App，请确保设备已安装并配置正确
 - 只需设置 `BARK_KEY` 即可启用 Bark 推送，无需额外开关
 - 支持自定义 Bark 服务器，通过设置 `BARK_SERVER` 环境变量
+- 当脚本检测到微信读书登录二维码并解析出登录链接时，会通过 Bark 推送链接（点击即可打开）
+
+## 登录链接推送配置（Bark + 邮件）
+
+脚本在检测到新的微信读书登录链接后，会自动推送：
+
+- Bark：配置 `BARK_KEY` 即可启用
+- 邮件：`ENABLE_EMAIL=true` 且配置完整 SMTP 参数后启用
+
+Docker Compose `environment` 示例：
+
+```yaml
+environment:
+  - WEREAD_REMOTE_BROWSER=http://selenium:4444
+  - WEREAD_DURATION=15
+  - WEREAD_SCREENSHOT=false
+  - WEREAD_USER=your-user
+  - WEREAD_SELECTION=-1
+  - ENABLE_EMAIL=true
+  - EMAIL_SMTP=smtp.mail.me.com
+  - EMAIL_USER=your-email@icloud.com
+  - EMAIL_PASS=your-app-password
+  - EMAIL_PORT=587
+  - EMAIL_TO=your-receiver@example.com
+  - BARK_KEY=your-bark-key
+  - DEFAULT_BOOK_URL=https://weread.qq.com/web/reader/276323e0813ab90a5g0144d7
+```
+
+说明：
+
+- 邮件推送登录链接依赖 `EMAIL_SMTP`、`EMAIL_USER`、`EMAIL_PASS`、`EMAIL_TO`
+- 若二维码刷新后登录链接变化，会推送新链接
+- 同一个登录链接只推送一次，避免重复提醒
 
 ## 多用户支持
 
