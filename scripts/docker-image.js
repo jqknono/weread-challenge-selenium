@@ -33,8 +33,9 @@ Options:
 Examples:
   node scripts/docker-image.js check
   node scripts/docker-image.js build --tag latest
-  node scripts/docker-image.js push --tag ${packageJson.version} --extra-tags latest
-  npm run docker:image:push -- --tag ${packageJson.version} --extra-tags latest`);
+  node scripts/docker-image.js push --tag ${packageJson.version}
+  npm run docker:image:push -- --tag ${packageJson.version}
+  npm run docker:image:push:dev`);
 }
 
 function fail(message) {
@@ -146,7 +147,7 @@ function buildCommandArgs(config) {
     args.push('--platform', config.platform);
   }
   args.push('-f', config.dockerfile);
-  [config.tag, ...config.extraTags].forEach((tag) => {
+  config.buildTags.forEach((tag) => {
     args.push('-t', `${config.image}:${tag}`);
   });
   args.push(config.context);
@@ -158,9 +159,22 @@ function printConfig(config) {
   console.log(`image: ${config.image}`);
   console.log(`primary tag: ${config.tag}`);
   console.log(`extra tags: ${config.extraTags.length ? config.extraTags.join(', ') : '(none)'}`);
+  console.log(`build tags: ${config.buildTags.join(', ')}`);
+  console.log(`push tags: ${config.pushTags.length ? config.pushTags.join(', ') : '(none)'}`);
   console.log(`dockerfile: ${config.dockerfile}`);
   console.log(`context: ${config.context}`);
   console.log(`platform: ${config.platform || '(default)'}`);
+}
+
+function resolvePushTags(config) {
+  if (config.command !== 'push') {
+    return [];
+  }
+  const tags = [config.tag, ...config.extraTags];
+  if (config.tag !== 'latest' && config.tag !== 'dev') {
+    tags.push('latest');
+  }
+  return uniqueTags(tags);
 }
 
 function runCommand(command, args) {
@@ -185,6 +199,8 @@ function main() {
 
   const config = resolveConfig(options);
   config.command = command;
+  config.pushTags = resolvePushTags(config);
+  config.buildTags = command === 'push' ? config.pushTags : uniqueTags([config.tag, ...config.extraTags]);
   ensureDockerAvailable();
   printConfig(config);
 
@@ -201,7 +217,7 @@ function main() {
     return;
   }
 
-  [config.tag, ...config.extraTags].forEach((tag) => {
+  config.pushTags.forEach((tag) => {
     const pushArgs = ['push', `${config.image}:${tag}`];
     console.log(`running: docker ${pushArgs.join(' ')}`);
     runCommand('docker', pushArgs);

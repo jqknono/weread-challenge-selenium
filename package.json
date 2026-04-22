@@ -23,6 +23,7 @@
     "docker:image:check": "node scripts/docker-image.js check",
     "docker:image:build": "node scripts/docker-image.js build",
     "docker:image:push": "node scripts/docker-image.js push",
+    "docker:image:push:dev": "node scripts/docker-image.js push --tag dev",
     "publish:npm:check": "node -e \"const p=require('./package.json');const miss=['name','version'].filter(k=>!p[k]);if(miss.length){console.error('缺少字段: '+miss.join(','));process.exit(1);}if(!/^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$/.test(p.version)){console.error('version 不是有效 semver: '+p.version);process.exit(1);}console.log('发布校验通过: '+p.name+'@'+p.version);\"",
     "publish:npm:dry-run": "npm run publish:npm:check && npm publish --access public --dry-run",
     "publish:npm": "npm run publish:npm:check && npm publish --access public"
