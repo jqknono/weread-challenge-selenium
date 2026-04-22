@@ -36,33 +36,26 @@ function getWereadVersion() {
 }
 
 const WEREAD_VERSION = getWereadVersion();
-const COOKIE_FILE = "./data/cookies.json"; // Path to save/load cookies
-const LOGIN_QR_CODE = "./data/login.png"; // Path to save login QR code
 const WEREAD_URL = "https://weread.qq.com/"; // Replace with the target URL
-const DEBUG = process.env.DEBUG === "true" || false; // Enable debug mode
-const WEREAD_USER = process.env.WEREAD_USER || "weread-default"; // User to use
-const WEREAD_REMOTE_BROWSER = process.env.WEREAD_REMOTE_BROWSER;
-const WEREAD_DURATION = process.env.WEREAD_DURATION || 10; // Reading duration in minutes
-const WEREAD_SPEED = process.env.WEREAD_SPEED || "slow"; // Reading speed, slow | normal | fast
-const WEREAD_SELECTION = process.env.WEREAD_SELECTION || 2; // Selection method
-const WEREAD_BROWSER = process.env.WEREAD_BROWSER || Browser.CHROME; // Browser to use, chrome | MicrosoftEdge | firefox
-const ENABLE_EMAIL = process.env.ENABLE_EMAIL === "true" || false; // Enable email notifications
-const WEREAD_SCREENSHOT =
-  process.env.WEREAD_SCREENSHOT === undefined
-    ? true
-    : process.env.WEREAD_SCREENSHOT === "true"; // Reading期间是否每分钟截图
-const WEREAD_AGREE_TERMS =
-  process.env.WEREAD_AGREE_TERMS === undefined
-    ? true
-    : process.env.WEREAD_AGREE_TERMS === "true"; // Agree to terms
-const EMAIL_PORT = parseInt(process.env.EMAIL_PORT) || 465; // SMTP port number, default 465
-const BARK_KEY = process.env.BARK_KEY || ""; // Bark推送密钥
-const BARK_SERVER = process.env.BARK_SERVER || "https://api.day.app"; // Bark服务器地址
-const DEFAULT_BOOK_URL =
-  process.env.DEFAULT_BOOK_URL ||
-  "https://weread.qq.com/web/reader/276323e0813ab90a5g0144d7"; // 默认阅读链接
 const QR_EXPIRED_TEXTS = ["点击刷新二维码", "二维码已失效"]; // 登录二维码过期提示
 let lastPushedLoginLink = "";
+let logStream = null;
+let DEBUG = false; // Enable debug mode
+let WEREAD_USER = "weread-default"; // User to use
+let WEREAD_REMOTE_BROWSER = "";
+let WEREAD_DURATION = 10; // Reading duration in minutes
+let WEREAD_SPEED = "slow"; // Reading speed, slow | normal | fast
+let WEREAD_SELECTION = 2; // Selection method
+let WEREAD_BROWSER = Browser.CHROME; // Browser to use, chrome | MicrosoftEdge | firefox
+let ENABLE_EMAIL = false; // Enable email notifications
+let WEREAD_SCREENSHOT = true; // Reading期间是否每分钟截图
+let WEREAD_AGREE_TERMS = true; // Agree to terms
+let EMAIL_PORT = 465; // SMTP port number, default 465
+let BARK_KEY = ""; // Bark推送密钥
+let BARK_SERVER = "https://api.day.app"; // Bark服务器地址
+let WEREAD_DATA_DIR = ".weread"; // 默认数据目录
+let DEFAULT_BOOK_URL =
+  "https://weread.qq.com/web/reader/276323e0813ab90a5g0144d7"; // 默认阅读链接
 // env vars:
 // WEREAD_REMOTE_BROWSER
 // WEREAD_DURATION
@@ -76,15 +69,191 @@ let lastPushedLoginLink = "";
 // EMAIL_TO
 // BARK_KEY
 // BARK_SERVER
+// WEREAD_DATA_DIR
 // DEFAULT_BOOK_URL
 
-// create /data directory if not exists
-if (!fs.existsSync("./data")) {
-  fs.mkdirSync("./data");
+const RUN_OPTION_SPECS = [
+  { envKey: "DEBUG", flag: "debug", type: "boolean", description: "Enable debug logging." },
+  { envKey: "WEREAD_USER", flag: "weread-user", type: "string", description: "Browser profile directory name." },
+  { envKey: "WEREAD_REMOTE_BROWSER", flag: "weread-remote-browser", type: "string", description: "Remote Selenium URL." },
+  { envKey: "WEREAD_DURATION", flag: "weread-duration", type: "integer", description: "Reading duration in minutes." },
+  { envKey: "WEREAD_SPEED", flag: "weread-speed", type: "string", description: "Reading speed: slow | normal | fast." },
+  { envKey: "WEREAD_SELECTION", flag: "weread-selection", type: "integer", description: "Book selection index." },
+  { envKey: "WEREAD_BROWSER", flag: "weread-browser", type: "string", description: "Browser name: chrome | MicrosoftEdge | firefox | safari." },
+  { envKey: "ENABLE_EMAIL", flag: "enable-email", type: "boolean", description: "Enable email notifications." },
+  { envKey: "WEREAD_SCREENSHOT", flag: "weread-screenshot", type: "boolean", description: "Capture screenshots while reading." },
+  { envKey: "WEREAD_AGREE_TERMS", flag: "weread-agree-terms", type: "boolean", description: "Enable usage telemetry upload." },
+  { envKey: "EMAIL_SMTP", flag: "email-smtp", type: "string", description: "SMTP server host." },
+  { envKey: "EMAIL_USER", flag: "email-user", type: "string", description: "SMTP username." },
+  { envKey: "EMAIL_PASS", flag: "email-pass", type: "string", description: "SMTP password." },
+  { envKey: "EMAIL_FROM", flag: "email-from", type: "string", description: "Email from address." },
+  { envKey: "EMAIL_TO", flag: "email-to", type: "string", description: "Email recipient." },
+  { envKey: "EMAIL_PORT", flag: "email-port", type: "integer", description: "SMTP port." },
+  { envKey: "BARK_KEY", flag: "bark-key", type: "string", description: "Bark notification key." },
+  { envKey: "BARK_SERVER", flag: "bark-server", type: "string", description: "Bark server base URL." },
+  { envKey: "WEREAD_DATA_DIR", flag: "weread-data-dir", type: "string", description: "Data directory for cookies, logs and screenshots." },
+  { envKey: "DEFAULT_BOOK_URL", flag: "default-book-url", type: "string", description: "Fallback reading URL." },
+];
+
+function parseBooleanValue(value, defaultValue = false, strict = false) {
+  if (value === undefined || value === null || value === "") {
+    return defaultValue;
+  }
+
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+  if (["true", "1", "yes", "y", "on"].includes(normalized)) {
+    return true;
+  }
+  if (["false", "0", "no", "n", "off"].includes(normalized)) {
+    return false;
+  }
+
+  if (!strict) {
+    return defaultValue;
+  }
+
+  throw new Error(`Invalid boolean value: ${value}`);
 }
 
-// override existing log file
-const logStream = fs.createWriteStream("./data/output.log", { flags: "w" });
+function parseIntegerValue(value, flagName) {
+  const parsed = Number.parseInt(String(value), 10);
+  if (!Number.isInteger(parsed)) {
+    throw new Error(`--${flagName} must be an integer`);
+  }
+  return parsed;
+}
+
+function resolveDefaultDataDir(cwd = process.cwd()) {
+  const preferredDir = ".weread";
+  const legacyDir = "data";
+  const preferredPath = path.resolve(cwd, preferredDir);
+  if (fs.existsSync(preferredPath)) {
+    return preferredDir;
+  }
+
+  const legacyPath = path.resolve(cwd, legacyDir);
+  if (fs.existsSync(legacyPath)) {
+    return legacyDir;
+  }
+
+  return preferredDir;
+}
+
+function setRuntimeConfigFromEnv(env = process.env) {
+  DEBUG = parseBooleanValue(env.DEBUG, false, false);
+  WEREAD_USER = env.WEREAD_USER || "weread-default";
+  WEREAD_REMOTE_BROWSER = env.WEREAD_REMOTE_BROWSER || "";
+  WEREAD_DURATION = env.WEREAD_DURATION === undefined
+    ? 10
+    : parseIntegerValue(env.WEREAD_DURATION, "weread-duration");
+  WEREAD_SPEED = env.WEREAD_SPEED || "slow";
+  WEREAD_SELECTION = env.WEREAD_SELECTION === undefined
+    ? 2
+    : parseIntegerValue(env.WEREAD_SELECTION, "weread-selection");
+  WEREAD_BROWSER = env.WEREAD_BROWSER || Browser.CHROME;
+  ENABLE_EMAIL = parseBooleanValue(env.ENABLE_EMAIL, false, false);
+  WEREAD_SCREENSHOT = env.WEREAD_SCREENSHOT === undefined
+    ? true
+    : parseBooleanValue(env.WEREAD_SCREENSHOT, true, false);
+  WEREAD_AGREE_TERMS = env.WEREAD_AGREE_TERMS === undefined
+    ? true
+    : parseBooleanValue(env.WEREAD_AGREE_TERMS, true, false);
+  EMAIL_PORT = env.EMAIL_PORT === undefined
+    ? 465
+    : parseIntegerValue(env.EMAIL_PORT, "email-port");
+  BARK_KEY = env.BARK_KEY || "";
+  BARK_SERVER = env.BARK_SERVER || "https://api.day.app";
+  WEREAD_DATA_DIR = env.WEREAD_DATA_DIR || resolveDefaultDataDir();
+  DEFAULT_BOOK_URL =
+    env.DEFAULT_BOOK_URL ||
+    "https://weread.qq.com/web/reader/276323e0813ab90a5g0144d7";
+}
+
+function getRunFlagValue(flags, spec) {
+  if (Object.prototype.hasOwnProperty.call(flags, spec.flag)) {
+    return flags[spec.flag];
+  }
+  if (Object.prototype.hasOwnProperty.call(flags, spec.envKey)) {
+    return flags[spec.envKey];
+  }
+  return undefined;
+}
+
+function applyRunCliOverrides(flags = {}) {
+  for (const spec of RUN_OPTION_SPECS) {
+    const rawValue = getRunFlagValue(flags, spec);
+    if (rawValue === undefined) {
+      continue;
+    }
+
+    if (spec.type === "boolean") {
+      process.env[spec.envKey] = parseBooleanValue(rawValue, true, true) ? "true" : "false";
+      continue;
+    }
+
+    if (spec.type === "integer") {
+      process.env[spec.envKey] = String(parseIntegerValue(rawValue, spec.flag));
+      continue;
+    }
+
+    process.env[spec.envKey] = String(rawValue);
+  }
+
+  setRuntimeConfigFromEnv(process.env);
+}
+
+function getRunOptionsHelpLines() {
+  return RUN_OPTION_SPECS.map(
+    (spec) =>
+      `  --${spec.flag}    ${spec.description} Env: ${spec.envKey}`
+  ).join("\n");
+}
+
+setRuntimeConfigFromEnv(process.env);
+
+function getDataDirPath() {
+  return path.resolve(WEREAD_DATA_DIR);
+}
+
+function getCookieFilePath() {
+  return path.join(getDataDirPath(), "cookies.json");
+}
+
+function getLoginQrCodePath() {
+  return path.join(getDataDirPath(), "login.png");
+}
+
+function getOutputLogPath() {
+  return path.join(getDataDirPath(), "output.log");
+}
+
+function getScreenshotPath(fileName = "screenshot.png") {
+  return path.join(getDataDirPath(), fileName);
+}
+
+function ensureDataDir() {
+  const dataDir = getDataDirPath();
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
+}
+
+function initializeRuntime() {
+  if (logStream) {
+    return;
+  }
+
+  ensureDataDir();
+  logStream = fs.createWriteStream(getOutputLogPath(), { flags: "w" });
+
+  if (!DEBUG) {
+    ["info", "warn", "error"].forEach(redirectConsole);
+  }
+}
 
 function formatLocalTimestamp(d = new Date()) {
   const pad2 = (n) => String(n).padStart(2, "0");
@@ -105,6 +274,88 @@ function escapeHtml(str = "") {
     .replace(/'/g, "&#39;");
 }
 
+function formatEmailSubject(subject) {
+  const versionLabel = `[v${WEREAD_VERSION}]`;
+  return String(subject).includes(versionLabel)
+    ? String(subject)
+    : `${subject} ${versionLabel}`;
+}
+
+function resolveEmailAttachments(filePaths = []) {
+  return filePaths
+    .filter(Boolean)
+    .filter((filePath) => {
+      if (fs.existsSync(filePath)) {
+        return true;
+      }
+      console.warn("邮件附件不存在，已跳过:", filePath);
+      return false;
+    });
+}
+
+function buildReportEmailHtml(text, attachments = [], options = {}) {
+  const safeText = escapeHtml(text);
+  const versionText = escapeHtml(WEREAD_VERSION);
+  const reportDate = escapeHtml(new Date().toLocaleDateString());
+  const extraHtml = options.extraHtml || "";
+  const imageGallery = attachments.length
+    ? `
+            <div class="image-gallery">
+                ${attachments
+                  .map(
+                    (att) => `
+                    <img src="cid:${att.cid}" alt="${escapeHtml(att.filename)}" style="display: block; margin: 10px auto; max-width: 100%;"/>
+                `
+                  )
+                  .join("")}
+            </div>
+      `
+    : "";
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        </style>
+    </head>
+    <body>
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="text-align: center; margin-bottom: 20px;">
+                <h2 style="color: #2c3e50;">WeRead Challenge Daily Report</h2>
+                <p style="color: #7f8c8d; margin-bottom: 4px;">${reportDate}</p>
+                <p style="color: #7f8c8d; margin-top: 0;">Version ${versionText}</p>
+            </div>
+
+            <div style="background: #f9f9f9; border-left: 4px solid #2980b9; padding: 15px; margin: 20px 0;">
+                <p>Dear User,</p>
+                <p>${safeText}</p>
+                <p>Here are your reading statistics and achievements for today.</p>
+            </div>
+
+            ${extraHtml}
+
+            ${imageGallery}
+
+            <div style="margin: 20px 0;">
+                <p>Best regards,</p>
+                <p style="color: #2980b9;">WeRead Challenge Team</p>
+            </div>
+
+            <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+
+            <div style="font-size: 12px; color: #7f8c8d; text-align: center;">
+                <p>This is an automated message, please do not reply.</p>
+                <p>Version ${versionText}</p>
+            </div>
+        </div>
+    </body>
+    </html>
+`;
+}
+
 // Utility function to redirect logging
 function redirectConsole(method) {
   const originalMethod = console[method];
@@ -112,16 +363,13 @@ function redirectConsole(method) {
     let logstr = `[${method.toUpperCase()}][${formatLocalTimestamp()}]: ` + args.join(" ");
 
     // Write to the log file
-    logStream.write(logstr + "\r\n");
+    if (logStream) {
+      logStream.write(logstr + "\r\n");
+    }
 
     // Also log to the console
     console.log(logstr);
   };
-}
-
-// Redirect all major console methods
-if (!DEBUG) {
-  ["info", "warn", "error"].forEach(redirectConsole);
 }
 
 // --- 诊断与健康检查工具函数 ---
@@ -232,7 +480,7 @@ function collectSeleniumLogs(tail = 300) {
       .replace(/[:.]/g, "-")
       .replace("T", "_")
       .replace("Z", "");
-    const outFile = path.join("./data", `selenium-logs-${ts}.log`);
+    const outFile = path.join(getDataDirPath(), `selenium-logs-${ts}.log`);
     let combined = "";
     for (const c of containers) {
       try {
@@ -337,11 +585,11 @@ function logEventToWereadLog(err) {
 
 function getUserInfo() {
   // return empty object if cookies file not found
-  if (!fs.existsSync(COOKIE_FILE)) {
+  if (!fs.existsSync(getCookieFilePath())) {
     return {};
   }
   // read from cookies
-  let cookiesFile = fs.readFileSync(COOKIE_FILE, "utf8");
+  let cookiesFile = fs.readFileSync(getCookieFilePath(), "utf8");
   let cookies = JSON.parse(cookiesFile);
   let userInfo = {};
   for (const cookie of cookies) {
@@ -524,6 +772,7 @@ function buildLoginLinkEmailHtml(loginUrl) {
   const safeUrl = escapeHtml(loginUrl);
   const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=360x360&data=${encodeURIComponent(loginUrl)}`;
   const safeQrImageUrl = escapeHtml(qrImageUrl);
+  const versionText = escapeHtml(WEREAD_VERSION);
   return `
   <!DOCTYPE html>
   <html>
@@ -540,13 +789,14 @@ function buildLoginLinkEmailHtml(loginUrl) {
   <body>
       <div class="card">
           <h2 style="color: #2c3e50;">微信读书登录二维码</h2>
+          <p style="color: #7f8c8d;">Version ${versionText}</p>
           <p>检测到新的扫码登录链接，请尽快在手机端完成登录。</p>
           <div class="qr-box">
             <img class="qr-img" src="${safeQrImageUrl}" alt="微信读书登录二维码" />
             <a class="open-link" href="${safeUrl}" target="_blank" rel="noopener noreferrer">点击打开登录链接</a>
           </div>
           <p style="font-size: 12px; color: #7f8c8d; margin-top: 16px;">
-            该链接由 weread-challenge 自动发送。
+            该链接由 weread-challenge 自动发送。Version ${versionText}
           </p>
       </div>
   </body>
@@ -710,7 +960,7 @@ async function refreshQRCode(driver) {
       await new Promise((resolve) => setTimeout(resolve, 1000));
       // 保存截图
       await driver.takeScreenshot().then((image, err) => {
-        fs.writeFileSync(LOGIN_QR_CODE, image, "base64");
+        fs.writeFileSync(getLoginQrCodePath(), image, "base64");
       });
       console.info("QR code refreshed, datetime: ", new Date());
       await extractAndDisplayQRCode(driver);
@@ -743,8 +993,10 @@ async function sendMail(subject, text, filePaths = [], options = {}) {
     },
   });
 
+  const existingFilePaths = resolveEmailAttachments(filePaths);
+
   // Convert image paths to attachments array
-  const attachments = filePaths.map((filePath) => ({
+  const attachments = existingFilePaths.map((filePath) => ({
     filename: path.basename(filePath),
     path: filePath,
     cid: path.basename(filePath), // Content ID for embedding in HTML
@@ -754,58 +1006,13 @@ async function sendMail(subject, text, filePaths = [], options = {}) {
   // Use EMAIL_FROM if provided, otherwise fall back to EMAIL_USER
   const fromAddress = process.env.EMAIL_FROM || process.env.EMAIL_USER;
 
-  const defaultHtml = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        </style>
-    </head>
-    <body>
-        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="text-align: center; margin-bottom: 20px;">
-                <h2 style="color: #2c3e50;">WeRead Challenge Daily Report</h2>
-                <p style="color: #7f8c8d;">${new Date().toLocaleDateString()}</p>
-            </div>
-
-            <div style="background: #f9f9f9; border-left: 4px solid #2980b9; padding: 15px; margin: 20px 0;">
-                <p>Dear User,</p>
-                <p>${text}</p>
-                <p>Here are your reading statistics and achievements for today.</p>
-            </div>
-
-            <div class="image-gallery">
-                ${attachments
-        .map(
-          (att) => `
-                    <img src="cid:${att.cid}" alt="Reading Progress" style="display: block; margin: 10px auto;"/>
-                `
-        )
-        .join("")}
-            </div>
-
-            <div style="margin: 20px 0;">
-                <p>Best regards,</p>
-                <p style="color: #2980b9;">WeRead Challenge Team</p>
-            </div>
-
-            <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-
-            <div style="font-size: 12px; color: #7f8c8d; text-align: center;">
-                <p>This is an automated message, please do not reply.</p>
-            </div>
-        </div>
-    </body>
-    </html>
-`;
+  const defaultHtml = buildReportEmailHtml(text, attachments, options);
 
   // Email options with updated from field
   let mailOptions = {
     from: fromAddress,
     to: process.env.EMAIL_TO,
-    subject: subject,
+    subject: formatEmailSubject(subject),
     text: text,
     attachments: attachments,
     html: options.html || defaultHtml,
@@ -892,7 +1099,496 @@ async function sendBark(title, body, options = {}) {
   }
 }
 
-async function main() {
+function quoteShellArg(value) {
+  return `'${String(value).replace(/'/g, `'\\''`)}'`;
+}
+
+function quotePlistString(value) {
+  return escapeHtml(String(value));
+}
+
+function escapePowerShellSingleQuoted(value) {
+  return String(value).replace(/'/g, "''");
+}
+
+function encodePowerShellCommand(script) {
+  return Buffer.from(script, "utf16le").toString("base64");
+}
+
+function parseCliArgs(argv) {
+  const args = [];
+  const flags = {};
+
+  for (let i = 0; i < argv.length; i += 1) {
+    const token = argv[i];
+    if (!token.startsWith("-")) {
+      args.push(token);
+      continue;
+    }
+
+    if (token === "--") {
+      args.push(...argv.slice(i + 1));
+      break;
+    }
+
+    const equalIndex = token.indexOf("=");
+    if (equalIndex > 0) {
+      const normalizedKey = token.slice(0, equalIndex).replace(/^-+/, "");
+      flags[normalizedKey] = token.slice(equalIndex + 1);
+      continue;
+    }
+
+    const normalizedKey = token.replace(/^-+/, "");
+    const nextToken = argv[i + 1];
+    if (nextToken && !nextToken.startsWith("-")) {
+      flags[normalizedKey] = nextToken;
+      i += 1;
+    } else {
+      flags[normalizedKey] = true;
+    }
+  }
+
+  return { args, flags };
+}
+
+function showHelp(command = "root") {
+  const sections = {
+    root: `
+Usage:
+  weread-selenium-cli run [run-options]
+  weread-selenium-cli schedule --name <task-name> --every <minutes> [--workdir <absolute-path>] [--platform <windows|macos|linux>] [--weread-duration <minutes>] [--dry-run]
+  weread-selenium-cli help [command]
+  weread-selenium-cli -h
+
+Commands:
+  run       Run the WeRead challenge flow.
+  schedule  Generate recurring scheduled-task commands for this CLI.
+  help      Show help for the CLI or a specific command.
+
+Notes:
+  - Legacy alias 'weread-challenge' remains supported and maps to the same CLI entrypoint.
+  - No arguments still run the existing reading flow for compatibility, and print a migration hint for run.
+  - schedule accepts an optional working directory and defaults to the current user's home directory.
+  - schedule only appends --weread-duration when generating task commands.
+  - schedule only prints create/verify/rollback commands and never registers tasks directly.
+  - run options override environment variables with the same meaning.
+`.trim(),
+    schedule: `
+Usage:
+  weread-selenium-cli schedule --name <task-name> --every <minutes> [--workdir <absolute-path>] [--platform <windows|macos|linux>] [--weread-duration <minutes>] [--dry-run]
+
+Required:
+  --name       Task name.
+  --every      Repeat interval in minutes. Must be a positive integer.
+
+Optional:
+  --workdir    Absolute working directory used by the task. Defaults to the current user's home directory.
+  --platform   windows | macos | linux. Defaults to current OS.
+  --weread-duration
+               Optional reading duration in minutes. This is the only run argument supported by schedule.
+  --dry-run    Deprecated. schedule now only prints commands and never applies them.
+  -h, --help   Show this help text.
+
+Examples:
+  weread-selenium-cli schedule --name weread-hourly --every 60 --platform windows
+  weread-selenium-cli schedule --name weread-hourly --every 60 --workdir /Users/me/weread-challenge-selenium --platform macos --dry-run
+  weread-selenium-cli schedule --name weread-hourly --every 60 --weread-duration 10
+
+Notes:
+  - schedule only prints create/verify/rollback commands and never registers tasks directly.
+  - On Windows, if the generated create command returns 'Access is denied', rerun it in an Administrator terminal.
+  - If --workdir is omitted, schedule uses the current user's home directory.
+  - schedule only supports appending --weread-duration to the generated run command.
+  - Local CLI runs prefer .weread, but reuse an existing ./data directory when WEREAD_DATA_DIR is not set.
+`.trim(),
+    run: `
+Usage:
+  weread-selenium-cli run [run-options]
+
+Options:
+  -h, --help   Show this help text.
+  Values below also accept their original env key form, for example --WEREAD_BROWSER.
+${getRunOptionsHelpLines()}
+
+Notes:
+  - Existing environment variables remain the configuration source.
+  - CLI run options override environment variables.
+  - Legacy alias 'weread-challenge' remains supported.
+  - Local CLI runs prefer .weread, but reuse an existing ./data directory when WEREAD_DATA_DIR is not set.
+  - Invoking the CLI with no arguments still behaves like run and prints a migration hint.
+`.trim(),
+  };
+
+  const output = sections[command] || sections.root;
+  console.log(output);
+}
+
+function getDefaultPlatform() {
+  switch (process.platform) {
+    case "win32":
+      return "windows";
+    case "darwin":
+      return "macos";
+    default:
+      return "linux";
+  }
+}
+
+function requireFlag(flags, name) {
+  if (!flags[name]) {
+    throw new Error(`Missing required flag --${name}`);
+  }
+  return String(flags[name]);
+}
+
+function requireAbsolutePath(targetPath, flagName) {
+  if (!path.isAbsolute(targetPath)) {
+    throw new Error(`--${flagName} must be an absolute path`);
+  }
+}
+
+function parseOptionalScheduleDuration(flags) {
+  if (!Object.prototype.hasOwnProperty.call(flags, "weread-duration")) {
+    return null;
+  }
+  return parseIntegerValue(flags["weread-duration"], "weread-duration");
+}
+
+function buildScheduledRunCommand(duration) {
+  if (duration === null) {
+    return "weread-selenium-cli run";
+  }
+  return `weread-selenium-cli run --weread-duration ${duration}`;
+}
+
+function resolveScheduleConfig(flags) {
+  const platform = String(flags.platform || getDefaultPlatform()).toLowerCase();
+  if (!["windows", "macos", "linux"].includes(platform)) {
+    throw new Error(`Unsupported platform: ${platform}`);
+  }
+
+  const name = requireFlag(flags, "name");
+  const every = Number.parseInt(requireFlag(flags, "every"), 10);
+  if (!Number.isInteger(every) || every <= 0) {
+    throw new Error("--every must be a positive integer");
+  }
+
+  const rawWorkdir = flags.workdir ? String(flags.workdir) : os.homedir();
+  requireAbsolutePath(rawWorkdir, "workdir");
+  const workdir = path.resolve(rawWorkdir);
+  const dryRun = Boolean(flags["dry-run"]);
+  const wereadDuration = parseOptionalScheduleDuration(flags);
+
+  return {
+    platform,
+    name,
+    every,
+    workdir,
+    command: buildScheduledRunCommand(wereadDuration),
+    dryRun,
+    wereadDuration,
+  };
+}
+
+function getWindowsTaskRunCommand(workdir, command) {
+  const homeDir = path.resolve(os.homedir());
+  const workdirLiteral =
+    path.resolve(workdir).toLowerCase() === homeDir.toLowerCase()
+      ? "%USERPROFILE%"
+      : workdir;
+  return `cmd /d /s /c "cd /d ${workdirLiteral}&&${command}"`;
+}
+
+function formatWindowsScheduleStartTime(date = new Date()) {
+  const scheduleStart = new Date(date.getTime() + 5 * 60 * 1000);
+  const hours = String(scheduleStart.getHours()).padStart(2, "0");
+  const minutes = String(scheduleStart.getMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}`;
+}
+
+function getWindowsSchedulePlan(config) {
+  const taskName = config.name;
+  const taskRun = getWindowsTaskRunCommand(config.workdir, config.command);
+  const startTime = formatWindowsScheduleStartTime();
+  const repetitionDuration = "8760:00";
+
+  return {
+    platform: "windows",
+    applyCommands: [
+      `schtasks /Create /F /TN "${taskName}" /SC DAILY /MO 1 /ST ${startTime} /RI ${config.every} /DU ${repetitionDuration} /TR '${taskRun}'`,
+    ],
+    verifyCommands: [
+      `schtasks /Query /TN "${taskName}" /V /FO LIST`,
+    ],
+    rollbackCommands: [
+      `schtasks /Delete /F /TN "${taskName}"`,
+    ],
+    summaryLines: [
+      `Platform: windows`,
+      `Task Name: ${config.name}`,
+      `Interval: every ${config.every} minute(s)`,
+      `Start Time: ${startTime}`,
+      `Working Directory: ${config.workdir}`,
+      `Command: ${config.command}`,
+      `Data Directory: ${path.join(config.workdir, ".weread")} (or existing ${path.join(config.workdir, "data")} in compatibility mode)`,
+      `Trigger: daily at ${startTime}, then every ${config.every} minute(s) for ${repetitionDuration}`,
+    ],
+  };
+}
+
+function getMacosSchedulePlan(config) {
+  const sanitizedName = config.name.replace(/[^A-Za-z0-9_.-]/g, "-");
+  const plistPath = path.join(
+    os.homedir(),
+    "Library",
+    "LaunchAgents",
+    `dev.techfetch.weread.${sanitizedName}.plist`
+  );
+  const plistContent = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>dev.techfetch.weread.${quotePlistString(sanitizedName)}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/sh</string>
+    <string>-lc</string>
+    <string>${quotePlistString(config.command)}</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>${quotePlistString(config.workdir)}</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StartInterval</key>
+  <integer>${config.every * 60}</integer>
+</dict>
+</plist>
+`;
+
+  return {
+    platform: "macos",
+    plistPath,
+    plistContent,
+    applyCommands: [
+      `mkdir -p ${quoteShellArg(path.dirname(plistPath))}`,
+      `cat <<'EOF' > ${quoteShellArg(plistPath)}\n${plistContent}\nEOF`,
+      `launchctl unload ${quoteShellArg(plistPath)} 2>/dev/null || true`,
+      `launchctl load -w ${quoteShellArg(plistPath)}`,
+    ],
+    verifyCommands: [
+      `launchctl list | grep ${quoteShellArg(`dev.techfetch.weread.${sanitizedName}`)}`,
+      `plutil -lint ${quoteShellArg(plistPath)}`,
+    ],
+    rollbackCommands: [
+      `launchctl unload -w ${quoteShellArg(plistPath)} 2>/dev/null || true`,
+      `rm -f ${quoteShellArg(plistPath)}`,
+    ],
+    summaryLines: [
+      `Platform: macos`,
+      `Task Name: ${config.name}`,
+      `Interval: every ${config.every} minute(s)`,
+      `Working Directory: ${config.workdir}`,
+      `Command: ${config.command}`,
+      `LaunchAgent: ${plistPath}`,
+    ],
+  };
+}
+
+function getLinuxSchedulePlan(config) {
+  const sanitizedName = config.name.replace(/[^A-Za-z0-9_.-]/g, "-");
+  const unitDir = path.join(os.homedir(), ".config", "systemd", "user");
+  const servicePath = path.join(unitDir, `${sanitizedName}.service`);
+  const timerPath = path.join(unitDir, `${sanitizedName}.timer`);
+  const serviceContent = `[Unit]
+Description=WeRead Challenge ${sanitizedName}
+
+[Service]
+Type=simple
+WorkingDirectory=${config.workdir}
+ExecStart=/bin/sh -lc ${quoteShellArg(config.command)}
+`;
+  const timerContent = `[Unit]
+Description=Run ${sanitizedName} every ${config.every} minute(s)
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=${config.every}min
+Unit=${sanitizedName}.service
+
+[Install]
+WantedBy=timers.target
+`;
+
+  return {
+    platform: "linux",
+    servicePath,
+    timerPath,
+    serviceContent,
+    timerContent,
+    applyCommands: [
+      `mkdir -p ${quoteShellArg(unitDir)}`,
+      `cat <<'EOF' > ${quoteShellArg(servicePath)}\n${serviceContent}\nEOF`,
+      `cat <<'EOF' > ${quoteShellArg(timerPath)}\n${timerContent}\nEOF`,
+      `systemctl --user daemon-reload`,
+      `systemctl --user enable --now ${quoteShellArg(`${sanitizedName}.timer`)}`,
+    ],
+    verifyCommands: [
+      `systemctl --user status ${quoteShellArg(`${sanitizedName}.timer`)}`,
+      `systemctl --user list-timers ${quoteShellArg(`${sanitizedName}.timer`)}`,
+    ],
+    rollbackCommands: [
+      `systemctl --user disable --now ${quoteShellArg(`${sanitizedName}.timer`)} || true`,
+      `rm -f ${quoteShellArg(servicePath)} ${quoteShellArg(timerPath)}`,
+      `systemctl --user daemon-reload`,
+    ],
+    summaryLines: [
+      `Platform: linux`,
+      `Task Name: ${config.name}`,
+      `Interval: every ${config.every} minute(s)`,
+      `Working Directory: ${config.workdir}`,
+      `Command: ${config.command}`,
+      `Service: ${servicePath}`,
+      `Timer: ${timerPath}`,
+    ],
+  };
+}
+
+function buildSchedulePlan(config) {
+  switch (config.platform) {
+    case "windows":
+      return getWindowsSchedulePlan(config);
+    case "macos":
+      return getMacosSchedulePlan(config);
+    case "linux":
+      return getLinuxSchedulePlan(config);
+    default:
+      throw new Error(`Unsupported platform: ${config.platform}`);
+  }
+}
+
+function getScheduleNotes(plan) {
+  const notes = [
+    "schedule only prints commands. It does not create the scheduled task for you.",
+    "Generated commands use weread-selenium-cli run. Existing weread-challenge tasks remain valid through the legacy bin alias.",
+    "If WEREAD_DATA_DIR is not set, runtime prefers .weread and reuses an existing ./data directory for compatibility.",
+  ];
+
+  if (plan.platform === "windows") {
+    notes.push(
+      "Windows task creation may require an elevated terminal. If the create command returns 'Access is denied', rerun it in an Administrator PowerShell or Command Prompt."
+    );
+  }
+
+  return notes;
+}
+
+function printSchedulePlan(plan, config) {
+  console.log(plan.summaryLines.join("\n"));
+  console.log("");
+  console.log("Create:");
+  console.log(plan.applyCommands.join("\n"));
+  console.log("");
+  console.log("Verify:");
+  console.log(plan.verifyCommands.join("\n"));
+  console.log("");
+  console.log("Rollback:");
+  console.log(plan.rollbackCommands.join("\n"));
+  console.log("");
+  console.log("Notes:");
+  console.log(getScheduleNotes(plan).join("\n"));
+  if (config.dryRun) {
+    console.log("Deprecated flag: --dry-run has no additional effect because schedule is already output-only.");
+  }
+}
+
+async function handleScheduleCommand(rawArgs) {
+  const parsed = parseCliArgs(rawArgs);
+  if (parsed.flags.h || parsed.flags.help || parsed.args[0] === "help") {
+    showHelp("schedule");
+    return;
+  }
+
+  const allowedFlags = new Set([
+    "name",
+    "every",
+    "workdir",
+    "platform",
+    "weread-duration",
+    "dry-run",
+    "h",
+    "help",
+  ]);
+  const unsupportedFlags = Object.keys(parsed.flags).filter((key) => !allowedFlags.has(key));
+  if (unsupportedFlags.length > 0) {
+    throw new Error(
+      `Unsupported schedule flag(s): ${unsupportedFlags.map((key) => `--${key}`).join(", ")}. schedule only supports --weread-duration in addition to its own task flags.`
+    );
+  }
+
+  const config = resolveScheduleConfig(parsed.flags);
+  if (config.platform !== getDefaultPlatform()) {
+    throw new Error(
+      `Cannot manage ${config.platform} schedule on ${getDefaultPlatform()}. Run this command on the target OS.`
+    );
+  }
+
+  const plan = buildSchedulePlan(config);
+  printSchedulePlan(plan, config);
+}
+
+async function dispatchCli(argv) {
+  const [command, ...restArgs] = argv;
+  const looksLikeCompatRun = !command || (command.startsWith("-") && command !== "-h" && command !== "--help");
+
+  if (looksLikeCompatRun) {
+    const compatArgs = command ? argv : [];
+    const parsed = parseCliArgs(compatArgs);
+    if (parsed.flags.h || parsed.flags.help) {
+      showHelp("run");
+      return;
+    }
+    if (parsed.args.length > 0) {
+      throw new Error(`Unexpected positional arguments for run: ${parsed.args.join(" ")}`);
+    }
+    applyRunCliOverrides(parsed.flags);
+    initializeRuntime();
+    console.warn(
+      "No subcommand provided. Running in compatibility mode as 'run'. Please switch to 'weread-selenium-cli run'."
+    );
+    await runMain();
+    return;
+  }
+
+  if (command === "-h" || command === "--help" || command === "help") {
+    showHelp(restArgs[0] || "root");
+    return;
+  }
+
+  if (command === "run") {
+    const parsed = parseCliArgs(restArgs);
+    if (parsed.flags.h || parsed.flags.help) {
+      showHelp("run");
+      return;
+    }
+    if (parsed.args.length > 0) {
+      throw new Error(`Unexpected positional arguments for run: ${parsed.args.join(" ")}`);
+    }
+    applyRunCliOverrides(parsed.flags);
+    initializeRuntime();
+    await runMain();
+    return;
+  }
+
+  if (command === "schedule") {
+    await handleScheduleCommand(restArgs);
+    return;
+  }
+
+  throw new Error(`Unknown command: ${command}`);
+}
+
+async function runMain() {
   console.info("Starting the script, datetime: ", new Date());
   let driver;
 
@@ -996,8 +1692,8 @@ async function main() {
 
     await driver.get(WEREAD_URL);
 
-    if (fs.existsSync(COOKIE_FILE)) {
-      await loadCookies(driver, COOKIE_FILE);
+    if (fs.existsSync(getCookieFilePath())) {
+      await loadCookies(driver, getCookieFilePath());
       await driver.navigate().refresh(); // Refresh to apply cookies
     }
 
@@ -1008,9 +1704,7 @@ async function main() {
     console.info("Successfully opened the url:", WEREAD_URL);
 
     // create dir data if not exists
-    if (!fs.existsSync("./data")) {
-      fs.mkdirSync("./data");
-    }
+    ensureDataDir();
 
     // Check if "Login" hyperlink exists
     console.info("Find login links...");
@@ -1036,7 +1730,7 @@ async function main() {
         await new Promise((resolve) => setTimeout(resolve, 1000));
         // save screenshot of QR code
         await driver.takeScreenshot().then((image, err) => {
-          fs.writeFileSync(LOGIN_QR_CODE, image, "base64");
+          fs.writeFileSync(getLoginQrCodePath(), image, "base64");
         });
         console.info("QR code saved, datetime: ", new Date());
         await extractAndDisplayQRCode(driver);
@@ -1098,7 +1792,7 @@ async function main() {
           if (qrElementFound) {
             await new Promise((resolve) => setTimeout(resolve, 1000));
             await driver.takeScreenshot().then((image, err) => {
-              fs.writeFileSync(LOGIN_QR_CODE, image, "base64");
+              fs.writeFileSync(getLoginQrCodePath(), image, "base64");
             });
             console.info("页面刷新后找到二维码, datetime: ", new Date());
             await extractAndDisplayQRCode(driver);
@@ -1111,7 +1805,23 @@ async function main() {
     if (maxRetries <= 0) {
       console.error("Failed to login.");
       if (ENABLE_EMAIL) {
-        await sendMail("[项目进展--项目停滞]", "Failed to login.");
+        const loginFailureAttachments = fs.existsSync(getLoginQrCodePath())
+          ? [getLoginQrCodePath()]
+          : [];
+        await sendMail(
+          "[项目进展--项目停滞]",
+          "Failed to login.",
+          loginFailureAttachments,
+          {
+            extraHtml: loginFailureAttachments.length
+              ? `
+            <div style="background: #fff7e6; border-left: 4px solid #fa8c16; padding: 15px; margin: 20px 0;">
+                <p style="margin: 0;">The current login QR code is attached below. Scan it to complete login.</p>
+            </div>
+          `
+              : "",
+          }
+        );
       }
       await sendBark("微信读书挑战", "登录失败", {
         subtitle: "项目停滞",
@@ -1124,7 +1834,7 @@ async function main() {
     console.info("Successfully logged in.");
 
     // If cookies exist, save them
-    await saveCookies(driver, COOKIE_FILE);
+    await saveCookies(driver, getCookieFilePath());
 
     if (WEREAD_AGREE_TERMS) {
       logEventToWereadLog("");
@@ -1189,10 +1899,10 @@ async function main() {
       await driver
         .takeScreenshot()
         .then((image, err) =>
-          fs.writeFileSync("./data/screenshot.png", image, "base64")
+          fs.writeFileSync(getScreenshotPath(), image, "base64")
         );
       await sendMail("[项目进展--项目启动]", "Login successful.", [
-        "./data/screenshot.png",
+        getScreenshotPath(),
       ]);
     }
     await sendBark("微信读书挑战", "登录成功", {
@@ -1231,7 +1941,7 @@ async function main() {
       if (currentTime.getMinutes() !== screenshotTime.getMinutes()) {
         // take screenshot every minute, and get round index
         let screenshotIndex = Math.round((currentTime - startTime) / 60000);
-        const screenshotPath = `./data/screenshot-${screenshotIndex}.png`;
+        const screenshotPath = getScreenshotPath(`screenshot-${screenshotIndex}.png`);
         if (WEREAD_SCREENSHOT) {
           await driver.takeScreenshot().then((image, err) => {
             fs.writeFileSync(screenshotPath, image, "base64");
@@ -1354,15 +2064,15 @@ async function main() {
     console.info("Reading completed.");
 
     // save cookies after reading
-    await saveCookies(driver, COOKIE_FILE);
+    await saveCookies(driver, getCookieFilePath());
     if (ENABLE_EMAIL) {
       await driver
         .takeScreenshot()
         .then((image, err) =>
-          fs.writeFileSync("./data/screenshot.png", image, "base64")
+          fs.writeFileSync(getScreenshotPath(), image, "base64")
         );
       await sendMail("[项目进展--项目完成]", "Reading completed.", [
-        "./data/screenshot.png",
+        getScreenshotPath(),
       ]);
     }
     await sendBark("微信读书挑战", `阅读完成，持续时间：${WEREAD_DURATION}分钟`, {
@@ -1408,4 +2118,42 @@ async function main() {
   }
 }
 
-main();
+function getRuntimeConfigSnapshot() {
+  return {
+    DEBUG,
+    WEREAD_USER,
+    WEREAD_REMOTE_BROWSER,
+    WEREAD_DURATION,
+    WEREAD_SPEED,
+    WEREAD_SELECTION,
+    WEREAD_BROWSER,
+    ENABLE_EMAIL,
+    WEREAD_SCREENSHOT,
+    WEREAD_AGREE_TERMS,
+    EMAIL_PORT,
+    BARK_KEY,
+    BARK_SERVER,
+    WEREAD_DATA_DIR,
+    DEFAULT_BOOK_URL,
+    EMAIL_SMTP: process.env.EMAIL_SMTP || "",
+    EMAIL_USER: process.env.EMAIL_USER || "",
+    EMAIL_PASS: process.env.EMAIL_PASS || "",
+    EMAIL_FROM: process.env.EMAIL_FROM || "",
+    EMAIL_TO: process.env.EMAIL_TO || "",
+  };
+}
+
+module.exports = {
+  RUN_OPTION_SPECS,
+  applyRunCliOverrides,
+  getRuntimeConfigSnapshot,
+  parseCliArgs,
+  setRuntimeConfigFromEnv,
+};
+
+if (require.main === module) {
+  dispatchCli(process.argv.slice(2)).catch((error) => {
+    console.error(error.message || error);
+    process.exit(1);
+  });
+}

@@ -6,7 +6,7 @@ services:
       - WEREAD_REMOTE_BROWSER=http://selenium:4444
       - WEREAD_DURATION=68
     volumes:
-      - ./data:/app/data
+      - ./.weread:/app/.weread
     depends_on:
       selenium:
         condition: service_healthy
