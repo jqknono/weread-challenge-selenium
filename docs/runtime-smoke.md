@@ -4,9 +4,9 @@
 
 | 组件 | 职责 | 输入 | 输出 | 依赖 | 关键约束 |
 | --- | --- | --- | --- | --- | --- |
-| `scripts/runtime-smoke.js npx` | 验证当前仓库打包后可被 `npx` 正常调起 | 当前仓库源码、`npm`、`npx` | CLI 帮助输出、通过/失败状态 | Node.js、npm | 只验证入口可执行与帮助输出，不触发真实阅读流程 |
-| `scripts/runtime-smoke.js docker` | 验证当前 `Dockerfile` 构建出的镜像可正常启动 CLI | 当前仓库源码、Docker daemon | 镜像构建日志、容器帮助输出、通过/失败状态 | Docker | 通过 `docker run --rm <image> node app.js -h` 验证镜像内 CLI，不依赖扫码登录或远程 Selenium |
-| `scripts/runtime-smoke.js all` | 串行执行两条核心运行路径 | 同上 | 汇总通过/失败状态 | Node.js、npm、Docker | 任一场景失败即退出非 0 |
+| `tests/runtime-smoke.js npx` | 验证当前仓库打包后可被 `npx` 正常调起 | 当前仓库源码、`npm`、`npx` | CLI 帮助输出、通过/失败状态 | Node.js、npm | 只验证入口可执行与帮助输出，不触发真实阅读流程 |
+| `tests/runtime-smoke.js docker` | 验证当前 `Dockerfile` 构建出的镜像可正常启动 CLI | 当前仓库源码、Docker daemon | 镜像构建日志、容器帮助输出、通过/失败状态 | Docker | 通过 `docker run --rm <image> node app.js -h` 验证镜像内 CLI，不依赖扫码登录或远程 Selenium |
+| `tests/runtime-smoke.js all` | 串行执行两条核心运行路径 | 同上 | 汇总通过/失败状态 | Node.js、npm、Docker | 任一场景失败即退出非 0 |
 
 ### 流程
 

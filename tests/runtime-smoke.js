@@ -12,7 +12,7 @@ const npxCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 function showHelp() {
   console.log(`
 Usage:
-  node scripts/runtime-smoke.js <command>
+  node tests/runtime-smoke.js <command>
 
 Commands:
   npx     Pack the current repo and verify the CLI can be launched by npx.

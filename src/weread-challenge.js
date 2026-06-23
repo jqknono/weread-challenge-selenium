@@ -56,6 +56,19 @@ let BARK_SERVER = "https://api.day.app"; // Bark服务器地址
 let WEREAD_DATA_DIR = ".weread"; // 默认数据目录
 let DEFAULT_BOOK_URL =
   "https://weread.qq.com/web/reader/276323e0813ab90a5g0144d7"; // 默认阅读链接
+
+// --- HTTP API 共享状态 ---
+let WEREAD_API_PORT = 8788;
+const apiState = {
+  phase: "idle", // idle | starting | login | reading | completed | error
+  startTime: null,
+  endTime: null,
+  bookUrl: null,
+  bookTitle: null,
+  bookAuthor: null,
+  lastError: null,
+  screenshotCount: 0,
+};
 // env vars:
 // WEREAD_REMOTE_BROWSER
 // WEREAD_DURATION
@@ -93,6 +106,7 @@ const RUN_OPTION_SPECS = [
   { envKey: "BARK_SERVER", flag: "bark-server", type: "string", description: "Bark server base URL." },
   { envKey: "WEREAD_DATA_DIR", flag: "weread-data-dir", type: "string", description: "Data directory for cookies, logs and screenshots." },
   { envKey: "DEFAULT_BOOK_URL", flag: "default-book-url", type: "string", description: "Fallback reading URL." },
+  { envKey: "WEREAD_API_PORT", flag: "weread-api-port", type: "integer", description: "HTTP API server port. Default: 8788. Set to 0 to disable." },
 ];
 
 function parseBooleanValue(value, defaultValue = false, strict = false) {
@@ -171,6 +185,9 @@ function setRuntimeConfigFromEnv(env = process.env) {
   DEFAULT_BOOK_URL =
     env.DEFAULT_BOOK_URL ||
     "https://weread.qq.com/web/reader/276323e0813ab90a5g0144d7";
+  WEREAD_API_PORT = env.WEREAD_API_PORT === undefined
+    ? 8788
+    : parseIntegerValue(env.WEREAD_API_PORT, "weread-api-port");
 }
 
 function getRunFlagValue(flags, spec) {
@@ -252,6 +269,158 @@ function initializeRuntime() {
 
   if (!DEBUG) {
     ["info", "warn", "error"].forEach(redirectConsole);
+  }
+}
+
+// --- HTTP API 服务 ---
+let apiServer = null;
+
+function maskSensitive(value) {
+  if (!value) return "";
+  if (value.length <= 4) return "****";
+  return value.slice(0, 2) + "****" + value.slice(-2);
+}
+
+function startApiServer() {
+  if (WEREAD_API_PORT === 0) {
+    console.info("WEREAD_API_PORT=0，HTTP API 服务已禁用");
+    return;
+  }
+
+  apiServer = http.createServer((req, res) => {
+    // CORS headers
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+    if (req.method === "OPTIONS") {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
+    if (req.method !== "GET") {
+      res.writeHead(405, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Method Not Allowed" }));
+      return;
+    }
+
+    const url = new URL(req.url, `http://localhost:${WEREAD_API_PORT}`);
+    const pathname = url.pathname;
+
+    try {
+      switch (pathname) {
+        case "/health":
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({
+            status: "ok",
+            phase: apiState.phase,
+            uptime: apiState.startTime ? Math.round((Date.now() - apiState.startTime) / 1000) : 0,
+          }));
+          break;
+
+        case "/qr": {
+          const qrPath = getLoginQrCodePath();
+          if (!fs.existsSync(qrPath)) {
+            res.writeHead(404, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "QR code not available yet" }));
+            break;
+          }
+          // 超过 3 分钟视为过期
+          const qrAge = Math.round((Date.now() - fs.statSync(qrPath).mtimeMs) / 60000);
+          if (qrAge > 3) {
+            res.writeHead(404, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({
+              error: "QR code expired",
+              ageMinutes: qrAge,
+            }));
+            break;
+          }
+          const qrData = fs.readFileSync(qrPath);
+          res.writeHead(200, {
+            "Content-Type": "image/png",
+            "Content-Length": qrData.length,
+            "Cache-Control": "no-cache",
+          });
+          res.end(qrData);
+          break;
+        }
+
+        case "/config": {
+          const snapshot = getRuntimeConfigSnapshot();
+          // 脱敏敏感字段
+          const masked = {
+            ...snapshot,
+            EMAIL_PASS: maskSensitive(snapshot.EMAIL_PASS),
+            BARK_KEY: maskSensitive(snapshot.BARK_KEY),
+          };
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(masked));
+          break;
+        }
+
+        case "/progress": {
+          const now = Date.now();
+          const elapsed = apiState.startTime
+            ? Math.round((now - apiState.startTime) / 60000)
+            : 0;
+          const remaining = apiState.endTime
+            ? Math.max(0, Math.round((apiState.endTime - now) / 60000))
+            : WEREAD_DURATION - elapsed;
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({
+            phase: apiState.phase,
+            duration: WEREAD_DURATION,
+            elapsedMinutes: elapsed,
+            remainingMinutes: remaining > 0 ? remaining : 0,
+            screenshotCount: apiState.screenshotCount,
+            startTime: apiState.startTime ? new Date(apiState.startTime).toISOString() : null,
+            endTime: apiState.endTime ? new Date(apiState.endTime).toISOString() : null,
+          }));
+          break;
+        }
+
+        case "/book": {
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({
+            phase: apiState.phase,
+            url: apiState.bookUrl || DEFAULT_BOOK_URL,
+            title: apiState.bookTitle || null,
+            author: apiState.bookAuthor || null,
+          }));
+          break;
+        }
+
+        default:
+          res.writeHead(404, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({
+            error: "Not Found",
+            endpoints: ["/health", "/qr", "/config", "/progress", "/book"],
+          }));
+          break;
+      }
+    } catch (err) {
+      console.warn("API 请求处理错误:", err.message);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Internal Server Error" }));
+    }
+  });
+
+  apiServer.listen(WEREAD_API_PORT, () => {
+    console.info(`HTTP API 服务已启动: http://localhost:${WEREAD_API_PORT}`);
+    console.info(`  端口: /health /qr /config /progress /book`);
+  });
+
+  apiServer.on("error", (err) => {
+    console.warn(`HTTP API 服务启动失败 (port ${WEREAD_API_PORT}):`, err.message);
+    apiServer = null;
+  });
+}
+
+function stopApiServer() {
+  if (apiServer) {
+    apiServer.close();
+    apiServer = null;
   }
 }
 
@@ -1592,6 +1761,11 @@ async function runMain() {
   console.info("Starting the script, datetime: ", new Date());
   let driver;
 
+  // 启动 HTTP API 服务
+  startApiServer();
+  apiState.phase = "starting";
+  apiState.startTime = Date.now();
+
   // 发送脚本启动通知
   await sendBark("微信读书挑战", "自动阅读脚本开始运行", {
     subtitle: "脚本启动",
@@ -1726,6 +1900,7 @@ async function runMain() {
       
       // 如果找到任何二维码相关元素，保存截图
       if (qrElementFound) {
+        apiState.phase = "login";
         // 避免截图时二维码还未弹出
         await new Promise((resolve) => setTimeout(resolve, 1000));
         // save screenshot of QR code
@@ -1833,6 +2008,10 @@ async function runMain() {
 
     console.info("Successfully logged in.");
 
+    // 更新 API 状态：进入阅读阶段
+    apiState.phase = "reading";
+    apiState.endTime = Date.now() + WEREAD_DURATION * 60000;
+
     // If cookies exist, save them
     await saveCookies(driver, getCookieFilePath());
 
@@ -1916,6 +2095,17 @@ async function runMain() {
     // await driver.executeScript(script);
     console.info("Reading started...");
 
+    // 捕获当前阅读的书本信息
+    try {
+      apiState.bookUrl = await driver.getCurrentUrl();
+      const titleEl = await driver.findElements(By.xpath("//span[contains(@class, 'readerTitle')] | //div[contains(@class, 'readerChapterTitle')] | //h1"));
+      if (titleEl.length > 0) {
+        apiState.bookTitle = await titleEl[0].getText();
+      }
+    } catch (_) {
+      // 忽略书本信息提取错误
+    }
+
     // duration from environment variable, WEREAD_DURATION in minutes
     console.info("Reading duration: ", WEREAD_DURATION, " minutes");
     console.info(
@@ -1949,6 +2139,7 @@ async function runMain() {
         }
         screenshotTime = currentTime;
         console.info("Reading minute: ", screenshotIndex);
+        apiState.screenshotCount = screenshotIndex;
 
         // if the screenshot png size is less than 100 KB, then refresh the page
         // continue if file not found
@@ -2063,6 +2254,8 @@ async function runMain() {
     }
     console.info("Reading completed.");
 
+    apiState.phase = "completed";
+
     // save cookies after reading
     await saveCookies(driver, getCookieFilePath());
     if (ENABLE_EMAIL) {
@@ -2090,6 +2283,9 @@ async function runMain() {
       }
     }
     console.info(errorMessage);
+
+    apiState.phase = "error";
+    apiState.lastError = errorMessage;
     // 出错时抓取 selenium 健康状态与容器日志
     await collectDiagnostics(errorMessage);
     if (ENABLE_EMAIL) {
@@ -2114,6 +2310,7 @@ async function runMain() {
       await driver.quit();
       console.info("Browser closed.");
     }
+    stopApiServer();
     process.exit(0);
   }
 }
@@ -2135,6 +2332,7 @@ function getRuntimeConfigSnapshot() {
     BARK_SERVER,
     WEREAD_DATA_DIR,
     DEFAULT_BOOK_URL,
+    WEREAD_API_PORT,
     EMAIL_SMTP: process.env.EMAIL_SMTP || "",
     EMAIL_USER: process.env.EMAIL_USER || "",
     EMAIL_PASS: process.env.EMAIL_PASS || "",
@@ -2149,6 +2347,8 @@ module.exports = {
   getRuntimeConfigSnapshot,
   parseCliArgs,
   setRuntimeConfigFromEnv,
+  startApiServer,
+  stopApiServer,
 };
 
 if (require.main === module) {
