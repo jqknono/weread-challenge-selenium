@@ -501,6 +501,7 @@ mkdir -p $HOME/weread-challenge/$WEREAD_USER2/.weread
 | 环境变量                | 默认值                                                    | 可选值                                | 说明                                                                                            |
 | ----------------------- | --------------------------------------------------------- | ------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | `WEREAD_USER`           | `weread-default`                                          | -                                     | 用户标识                                                                                        |
+| `WEREAD_USER_DATA_DIR`  | 本地：`<系统临时目录>/weread-challenge/<浏览器名>`；远程：空 | -                                     | Chrome/Edge 用户数据根目录，通过 `--user-data-dir` 传递；可显式覆盖默认路径 |
 | `WEREAD_REMOTE_BROWSER` | ""                                                        | -                                     | 远程浏览器地址                                                                                  |
 | `WEREAD_DURATION`       | `10`                                                      | -                                     | 阅读时长                                                                                        |
 | `WEREAD_SPEED`          | `slow`                                                    | `slow,normal,fast`                    | 阅读速度                                                                                        |
@@ -518,6 +519,37 @@ mkdir -p $HOME/weread-challenge/$WEREAD_USER2/.weread
 | `BARK_KEY`              | ""                                                        | -                                     | Bark 推送密钥                                                                                   |
 | `BARK_SERVER`           | `https://api.day.app`                                     | -                                     | Bark 服务器地址                                                                                 |
 | `WEREAD_AGREE_TERMS`    | `true`                                                    | `true,false`                          | 隐私同意条款                                                                                    |
+
+### 固定浏览器临时目录
+
+本地 Chrome/Edge 默认复用固定目录，不再每次生成随机用户数据目录。临时根目录通过 Node.js `os.tmpdir()` 获取，路径使用当前系统的分隔符，不硬编码 Windows 路径或 `/tmp`。未设置或设置为空时均使用默认值。Firefox/Safari 不使用此配置。
+
+| 系统 | Chrome 默认路径示例 |
+| --- | --- |
+| Windows | `%TEMP%\weread-challenge\chrome`（通常位于用户的 `AppData\Local\Temp`） |
+| macOS | `$TMPDIR/weread-challenge/chrome`（通常位于 `/var/folders/.../T/`） |
+| Linux | `/tmp/weread-challenge/chrome`（可受 `TMPDIR` 等环境变量影响） |
+
+实际根目录以 `os.tmpdir()` 为准；Edge 使用同一根目录下的 `weread-challenge/MicrosoftEdge`，与 Chrome 分开。
+
+本地自定义相对路径按 CLI 当前工作目录转为绝对路径。路径包含空格时，请在命令行中加引号；程序不会自行展开路径字符串中的 `~`、`%TEMP%` 或 `$HOME`，应由 shell 展开。例如：
+
+```powershell
+# Windows PowerShell
+node src/weread-challenge.js run --weread-user-data-dir "$env:LOCALAPPDATA\weread-challenge\chrome"
+```
+
+```sh
+# macOS / Linux
+node src/weread-challenge.js run --weread-user-data-dir "$HOME/.weread-browser/chrome"
+```
+
+- 目录在浏览器退出后保留，系统清理临时文件时可能删除它；需要长期保存时，用 `WEREAD_USER_DATA_DIR` 或 `--weread-user-data-dir` 指定专用的持久目录。
+- 同一个用户数据根目录只能供一个浏览器实例使用。多账号或并发任务应分别指定不同根目录，不能仅通过 `WEREAD_USER` 区分。
+- Linux 的 `/tmp` 可能由多个系统用户共享。共享主机上不同用户应指定各自拥有且可写的专用目录（如上面的 `$HOME/.weread-browser/chrome`），避免固定目录的权限冲突；不应使用日常浏览器的个人配置目录。
+- 远程 Selenium 默认仍由驱动管理临时目录；若需固定目录，必须显式指定浏览器所在机器或容器内的路径，不使用本机临时路径。
+- 远端路径原样传递、不按客户端系统改写。Windows 客户端连接 Linux Selenium 时，应传 `/profiles/account-1` 这样的远端绝对路径；目录须对远端浏览器用户可写，容器重建后需保留时应挂载持久卷。
+- 此设置不限制缓存大小，也不清理历史随机目录或其他浏览器临时文件。
 
 <!-- ## 容器多架构支持
 

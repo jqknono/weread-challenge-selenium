@@ -42,6 +42,7 @@ let lastPushedLoginLink = "";
 let logStream = null;
 let DEBUG = false; // Enable debug mode
 let WEREAD_USER = "weread-default"; // User to use
+let WEREAD_USER_DATA_DIR = "";
 let WEREAD_REMOTE_BROWSER = "";
 let WEREAD_DURATION = 10; // Reading duration in minutes
 let WEREAD_SPEED = "slow"; // Reading speed, slow | normal | fast
@@ -70,6 +71,7 @@ const apiState = {
   screenshotCount: 0,
 };
 // env vars:
+// WEREAD_USER_DATA_DIR
 // WEREAD_REMOTE_BROWSER
 // WEREAD_DURATION
 // WEREAD_BROWSER
@@ -88,6 +90,7 @@ const apiState = {
 const RUN_OPTION_SPECS = [
   { envKey: "DEBUG", flag: "debug", type: "boolean", description: "Enable debug logging." },
   { envKey: "WEREAD_USER", flag: "weread-user", type: "string", description: "Browser profile directory name." },
+  { envKey: "WEREAD_USER_DATA_DIR", flag: "weread-user-data-dir", type: "string", description: "Chrome or Edge user data directory. Local default: <OS temp>/weread-challenge/<browser>. Remote: specify a path on the browser host." },
   { envKey: "WEREAD_REMOTE_BROWSER", flag: "weread-remote-browser", type: "string", description: "Remote Selenium URL." },
   { envKey: "WEREAD_DURATION", flag: "weread-duration", type: "integer", description: "Reading duration in minutes." },
   { envKey: "WEREAD_SPEED", flag: "weread-speed", type: "string", description: "Reading speed: slow | normal | fast." },
@@ -157,6 +160,23 @@ function resolveDefaultDataDir(cwd = process.cwd()) {
   return preferredDir;
 }
 
+function resolveBrowserUserDataDir(env, {
+  tempDir = os.tmpdir(),
+  cwd = process.cwd(),
+  pathApi = path,
+} = {}) {
+  // Remote paths belong to the browser host, not the CLI host.
+  if (env.WEREAD_REMOTE_BROWSER) {
+    return env.WEREAD_USER_DATA_DIR || "";
+  }
+  const browser = env.WEREAD_BROWSER || Browser.CHROME;
+  if (![Browser.CHROME, Browser.EDGE].includes(browser)) {
+    return "";
+  }
+  const directory = env.WEREAD_USER_DATA_DIR || pathApi.join(tempDir, "weread-challenge", browser);
+  return pathApi.resolve(cwd, directory);
+}
+
 function setRuntimeConfigFromEnv(env = process.env) {
   DEBUG = parseBooleanValue(env.DEBUG, false, false);
   WEREAD_USER = env.WEREAD_USER || "weread-default";
@@ -169,6 +189,7 @@ function setRuntimeConfigFromEnv(env = process.env) {
     ? 2
     : parseIntegerValue(env.WEREAD_SELECTION, "weread-selection");
   WEREAD_BROWSER = env.WEREAD_BROWSER || Browser.CHROME;
+  WEREAD_USER_DATA_DIR = resolveBrowserUserDataDir(env);
   ENABLE_EMAIL = parseBooleanValue(env.ENABLE_EMAIL, false, false);
   WEREAD_SCREENSHOT = env.WEREAD_SCREENSHOT === undefined
     ? true
@@ -1757,6 +1778,18 @@ async function dispatchCli(argv) {
   throw new Error(`Unknown command: ${command}`);
 }
 
+function createChromiumBuilder(options, capabilities) {
+  const builder = new Builder()
+    .forBrowser(WEREAD_BROWSER)
+    .withCapabilities(capabilities);
+  if (WEREAD_BROWSER === Browser.EDGE) {
+    builder.setEdgeOptions(options);
+  } else {
+    builder.setChromeOptions(options);
+  }
+  return builder;
+}
+
 async function runMain() {
   console.info("Starting the script, datetime: ", new Date());
   let driver;
@@ -1805,10 +1838,15 @@ async function runMain() {
         options.addArguments("--disable-gpu");
         options.addArguments("--disable-dev-shm-usage");
         options.addArguments("--profile-directory=" + WEREAD_USER);
+        if (WEREAD_USER_DATA_DIR !== "") {
+          options.addArguments("--user-data-dir=" + WEREAD_USER_DATA_DIR);
+          console.info("WEREAD_USER_DATA_DIR: ", WEREAD_USER_DATA_DIR);
+        }
         options.addArguments("--disable-infobars");
         options.addArguments("--disable-extensions");
         options.addArguments("--disable-notifications");
         options.addArguments("--disable-popup-blocking");
+        const builder = createChromiumBuilder(options, capabilities);
         // check if WEREAD_REMOTE_BROWSER is empty
         if (WEREAD_REMOTE_BROWSER) {
           // 远端启动前做一次健康检查
@@ -1819,20 +1857,11 @@ async function runMain() {
             remoteBrowserUrl = "http://" + remoteBrowserUrl;
           }
           console.info("WEREAD_REMOTE_BROWSER: ", remoteBrowserUrl);
-          driver = await new Builder()
-            .usingServer(remoteBrowserUrl)
-            .forBrowser(WEREAD_BROWSER)
-            .withCapabilities(capabilities)
-            .setChromeOptions(options)
-            .build();
+          builder.usingServer(remoteBrowserUrl);
         } else {
           console.info("WEREAD_REMOTE_BROWSER not found. Running locally.");
-          driver = await new Builder()
-            .forBrowser(WEREAD_BROWSER)
-            .withCapabilities(capabilities)
-            .setChromeOptions(options)
-            .build();
         }
+        driver = await builder.build();
         break;
       case Browser.FIREFOX:
         driver = await new Builder().forBrowser(Browser.FIREFOX).build();
@@ -2319,6 +2348,7 @@ function getRuntimeConfigSnapshot() {
   return {
     DEBUG,
     WEREAD_USER,
+    WEREAD_USER_DATA_DIR,
     WEREAD_REMOTE_BROWSER,
     WEREAD_DURATION,
     WEREAD_SPEED,
@@ -2343,6 +2373,8 @@ function getRuntimeConfigSnapshot() {
 
 module.exports = {
   RUN_OPTION_SPECS,
+  createChromiumBuilder,
+  resolveBrowserUserDataDir,
   applyRunCliOverrides,
   getRuntimeConfigSnapshot,
   parseCliArgs,
